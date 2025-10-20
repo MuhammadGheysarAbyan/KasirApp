@@ -437,7 +437,7 @@ private void editProduk() {
         "Nama Produk:", tfNama,
         "Kategori:", tfKategori,
         "Harga:", tfHarga,
-        "Stok:", tfStok,
+        "Stok:", tfStok,    
         btnPilihFoto, lblFoto
     };
 
