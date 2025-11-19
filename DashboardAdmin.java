@@ -16,9 +16,6 @@ public class DashboardAdmin extends JFrame {
     private Timer clockTimer;
     private Connection conn;
 
-    // tambahan shift
-    private String shift = "Tidak diketahui";
-
     // Colors
     private static final Color BLUE_PRIMARY = new Color(0, 102, 204);
     private static final Color TEXT_DARK = new Color(44, 62, 80);
@@ -32,9 +29,8 @@ public class DashboardAdmin extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLayout(new BorderLayout());
-
-        connectDatabase();
-        loadShiftFromDB(); // ambil shift dari database
+        
+        connectDatabase();   // <--- WAJIB ADA DI SINI
 
         // Background panel
         JPanel background = new JPanel() {
@@ -78,19 +74,6 @@ public class DashboardAdmin extends JFrame {
         }
     }
 
-    private void loadShiftFromDB() {
-        try {
-            PreparedStatement ps = conn.prepareStatement("SELECT shift FROM users WHERE username = ?");
-            ps.setString(1, admin);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                shift = rs.getString("shift");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
     private JPanel createTopPanel() {
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
@@ -119,14 +102,8 @@ leftPanel.add(lblLogo);
         lblRole.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         lblRole.setForeground(new Color(255, 255, 255, 180));
 
-        // Label shift dari database
-        JLabel lblShift = new JLabel("Shift: " + shift);
-        lblShift.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        lblShift.setForeground(new Color(255, 255, 255, 200));
-
         welcomePanel.add(lblWelcome);
         welcomePanel.add(lblRole);
-        welcomePanel.add(lblShift);
 
         leftPanel.add(welcomePanel);
 

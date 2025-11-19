@@ -167,10 +167,12 @@ public class ManajemenProduk extends JFrame {
         JButton btnEdit   = createButton("Edit", "/img/edit.png", new Color(0, 204, 102));
         JButton btnHapus  = createButton("Hapus", "/img/delete.png", new Color(255, 77, 77));
         JButton btnBack   = createButton("Kembali", "/img/back.png", new Color(153, 153, 153));
+        JButton btnKelolaKategori = createButton("Kategori", "/img/category.png", new Color(155, 89, 182));
 
         btnPanel.add(btnTambah);
         btnPanel.add(btnEdit);
         btnPanel.add(btnHapus);
+        btnPanel.add(btnKelolaKategori);
         btnPanel.add(btnBack);
         mainPanel.add(btnPanel, BorderLayout.SOUTH);
         add(mainPanel);
@@ -178,7 +180,11 @@ public class ManajemenProduk extends JFrame {
         // ================= ACTIONS =================
         loadData();
 
-        btnTambah.addActionListener(e -> tambahProduk());
+        btnTambah.addActionListener(e -> {
+            table.clearSelection();
+            selectedId = null;
+            tambahProduk();
+        });
         btnEdit.addActionListener(e -> editProduk());
         btnHapus.addActionListener(e -> hapusProduk());
         btnBack.addActionListener(e -> {
@@ -186,6 +192,7 @@ public class ManajemenProduk extends JFrame {
             dash.setVisible(true);
             dispose();
         });
+        btnKelolaKategori.addActionListener(e -> new KelolaKategoriDialog(this).setVisible(true));
 
         table.getSelectionModel().addListSelectionListener(e -> {
             int row = table.getSelectedRow();
@@ -220,101 +227,71 @@ public class ManajemenProduk extends JFrame {
         lblHeader.setBorder(BorderFactory.createEmptyBorder(15, 0, 15, 0));
         return lblHeader;
     }
-
-    private ImageIcon loadRoundedLogo(String path, int size) {
-        try {
-            if (path.startsWith("/")) path = path.substring(1);
-            java.net.URL imgURL = getClass().getClassLoader().getResource(path);
-            if (imgURL != null) {
-                ImageIcon originalIcon = new ImageIcon(imgURL);
-                Image scaledImage = originalIcon.getImage().getScaledInstance(size, size, Image.SCALE_SMOOTH);
-
-                BufferedImage rounded = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
-                Graphics2D g2 = rounded.createGraphics();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setClip(new RoundRectangle2D.Double(0, 0, size, size, size / 5, size / 5));
-                g2.drawImage(scaledImage, 0, 0, null);
-                g2.dispose();
-
-                return new ImageIcon(rounded);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    // ================= BUTTON =================
-    private JButton createButton(String text, String iconPath, Color bgColor) {
-        ImageIcon icon = null;
-        try {
-            icon = new ImageIcon(getClass().getResource(iconPath));
-            Image img = icon.getImage().getScaledInstance(15, 15, Image.SCALE_SMOOTH);
-            icon = new ImageIcon(img);
-        } catch (Exception e) {
-            System.out.println("Gagal load icon: " + iconPath);
-        }
-
-        JButton btn = new JButton(text, icon);
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        btn.setBackground(bgColor);
-        btn.setForeground(Color.WHITE);
-        btn.setFocusPainted(false);
-        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btn.setHorizontalTextPosition(SwingConstants.RIGHT);
-        btn.setIconTextGap(10);
-
-        btn.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.event.MouseEvent evt) { btn.setBackground(bgColor.darker()); }
-            public void mouseExited(java.awt.event.MouseEvent evt) { btn.setBackground(bgColor); }
-        });
-        return btn;
-    }
-
-
-    // ================= LOAD DATA =================
-    private void loadData() {
-        model.setRowCount(0);
-        selectedId = null;
-        try (Connection conn = Database.getConnection()) {
-            String sql = "SELECT * FROM produk ORDER BY id ASC";
-            Statement st = conn.createStatement();
-            ResultSet rs = st.executeQuery(sql);
-            while (rs.next()) {
-                int id = rs.getInt("id");
-                String kodeProduk = generateKodeProduk(id);
-                String fotoPath = rs.getString("foto");
-                ImageIcon imgIcon = null;
-                if (fotoPath != null && !fotoPath.isEmpty()) {
-                    try {
-                        Image img = new ImageIcon(fotoPath).getImage()
-                                .getScaledInstance(50, 50, Image.SCALE_SMOOTH);
-                        imgIcon = new ImageIcon(img);
-                    } catch (Exception ex) {
-                        System.out.println("Gagal load foto: " + fotoPath);
-                    }
+private void loadData() {
+    model.setRowCount(0);
+    selectedId = null;
+    try (Connection conn = Database.getConnection()) {
+        // urut per kategori, lalu id
+        String sql = "SELECT * FROM produk ORDER BY kategori ASC, id ASC";
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(sql);
+        while (rs.next()) {
+            int id = rs.getInt("id");
+            String kategori = rs.getString("kategori");
+            String kode = rs.getString("kode"); // ambil langsung dari kolom 'kode'
+            String fotoPath = rs.getString("foto");
+            ImageIcon imgIcon = null;
+            if (fotoPath != null && !fotoPath.isEmpty()) {
+                try {
+                    Image img = new ImageIcon(fotoPath).getImage()
+                            .getScaledInstance(50, 50, Image.SCALE_SMOOTH);
+                    imgIcon = new ImageIcon(img);
+                } catch (Exception ex) {
+                    System.out.println("Gagal load foto: " + fotoPath);
                 }
-
-                model.addRow(new Object[]{
-                        kodeProduk,
-                        rs.getString("nama_produk"),
-                        rs.getString("kategori"),
-                        new DecimalFormat("#,###").format(rs.getDouble("harga")),
-                        rs.getInt("stok"),
-                        imgIcon
-                });
             }
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Gagal load data!\n" + e.getMessage());
+
+            model.addRow(new Object[]{
+                    kode,
+                    rs.getString("nama_produk"),
+                    kategori,
+                    new DecimalFormat("#,###").format(rs.getDouble("harga")),
+                    rs.getInt("stok"),
+                    imgIcon
+            });
+        }
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(this, "Gagal load data!\n" + e.getMessage());
+    }
+}
+
+private String generateKodeKategori(Connection conn, String kategori) throws SQLException {
+    // ambil 3 huruf pertama kategori, uppercase
+    String prefix = kategori.toUpperCase().replaceAll("\\s+", "");
+    prefix = prefix.length() >= 3 ? prefix.substring(0, 3) : prefix;
+
+    // cari nomor terakhir di kategori ini
+    String sql = "SELECT kode FROM produk WHERE kategori=? ORDER BY id ASC";
+    PreparedStatement pst = conn.prepareStatement(sql);
+    pst.setString(1, kategori);
+    ResultSet rs = pst.executeQuery();
+
+    int maxNumber = 0;
+    while (rs.next()) {
+        String kode = rs.getString("kode");
+        if (kode != null && !kode.isEmpty()) {
+            String numPart = kode.replaceAll("[^0-9]", "");
+            if (!numPart.isEmpty()) {
+                int n = Integer.parseInt(numPart);
+                if (n > maxNumber) maxNumber = n;
+            }
         }
     }
 
-    // ================= GENERATE KODE PRODUK =================
-    private String generateKodeProduk(int id) {
-        return String.format("PRO-%04d", id);
-    }
+    int nextNumber = maxNumber + 1;
+    return String.format("%s%02d", prefix, nextNumber); // LAP01, LAP02, BAT01, BAT02
+}
 
-    // ================= CARI ID KOSONG UNTUK PRODUK BARU =================
     private int getNextAvailableId(Connection conn) throws SQLException {
         String sql = "SELECT id FROM produk ORDER BY id ASC";
         Statement st = conn.createStatement();
@@ -327,31 +304,33 @@ public class ManajemenProduk extends JFrame {
         }
         return expected;
     }
-    
-    // ================= GET ID BY ROW =================
-private String getIdByRow(int row) {
-    try (Connection conn = Database.getConnection()) {
-        String kode = model.getValueAt(row, 0).toString();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery("SELECT id FROM produk ORDER BY id DESC");
-        while (rs.next()) {
-            int id = rs.getInt("id");
-            if (generateKodeProduk(id).equals(kode)) {
-                return String.valueOf(id);
+
+    private String getIdByRow(int row) {
+        try (Connection conn = Database.getConnection()) {
+            String kode = model.getValueAt(row, 0).toString();
+            Statement st = conn.createStatement();
+            ResultSet rs = st.executeQuery("SELECT id, kategori FROM produk ORDER BY id DESC");
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String kategori = rs.getString("kategori");
+                if (generateKodeKategori(conn, kategori).equals(kode)) {
+                    return String.valueOf(id);
+                }
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-    } catch (Exception e) {
-        e.printStackTrace();
+        return null;
     }
-    return null;
-}
 
 private void tambahProduk() {
     JTextField tfNama = new JTextField();
-    JTextField tfKategori = new JTextField(); // kategori manual
     JTextField tfHarga = new JTextField();
     JTextField tfStok = new JTextField();
     formatRupiah(tfHarga);
+
+    JComboBox<String> cbKategori = new JComboBox<>();
+    loadKategori(cbKategori);
 
     JButton btnPilihFoto = new JButton("Pilih Foto");
     JLabel lblFoto = new JLabel("");
@@ -368,32 +347,37 @@ private void tambahProduk() {
     });
 
     Object[] message = {
-        "Nama Produk:", tfNama,
-        "Kategori:", tfKategori,
-        "Harga:", tfHarga,
-        "Stok:", tfStok,
-        btnPilihFoto, lblFoto
+            "Nama Produk:", tfNama,
+            "Kategori:", cbKategori,
+            "Harga:", tfHarga,
+            "Stok:", tfStok,
+            btnPilihFoto, lblFoto
     };
 
     int option = JOptionPane.showConfirmDialog(this, message, "Tambah Produk", JOptionPane.OK_CANCEL_OPTION);
     if (option == JOptionPane.OK_OPTION) {
         try (Connection conn = Database.getConnection()) {
             int newId = getNextAvailableId(conn);
-
             double harga = parseRupiah(tfHarga.getText());
             int stok = Integer.parseInt(tfStok.getText());
 
-            String sql = "INSERT INTO produk (id, nama_produk, kategori, harga, stok, foto) VALUES (?,?,?,?,?,?)";
+            // ================= generate kode =================
+            String kategori = cbKategori.getSelectedItem().toString();
+            String kodeBaru = generateKodeKategori(conn, kategori);
+
+            // ================= simpan ke database =================
+            String sql = "INSERT INTO produk (id, kode, nama_produk, kategori, harga, stok, foto) VALUES (?,?,?,?,?,?,?)";
             PreparedStatement pst = conn.prepareStatement(sql);
             pst.setInt(1, newId);
-            pst.setString(2, tfNama.getText().trim());
-            pst.setString(3, tfKategori.getText().trim()); // manual input
-            pst.setDouble(4, harga);
-            pst.setInt(5, stok);
-            pst.setString(6, pathFoto[0]);
+            pst.setString(2, kodeBaru); // simpan kode
+            pst.setString(3, tfNama.getText().trim());
+            pst.setString(4, kategori);
+            pst.setDouble(5, harga);
+            pst.setInt(6, stok);
+            pst.setString(7, pathFoto[0]);
             pst.executeUpdate();
 
-            JOptionPane.showMessageDialog(this, "Produk berhasil ditambahkan!\nKode Produk: " + generateKodeProduk(newId));
+            JOptionPane.showMessageDialog(this, "Produk berhasil ditambahkan!");
             loadData();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Gagal tambah produk!\n" + e.getMessage());
@@ -401,72 +385,78 @@ private void tambahProduk() {
     }
 }
 
-private void editProduk() {
-    if (selectedId == null) {
-        JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
-        return;
+
+    private void editProduk() {
+        if (selectedId == null) {
+            JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
+            return;
+        }
+
+        int row = table.getSelectedRow();
+        String namaAwal = model.getValueAt(row, 1).toString();
+        String kategoriAwal = model.getValueAt(row, 2).toString();
+        String hargaAwal = model.getValueAt(row, 3).toString().replaceAll("[^0-9]", "");
+        String stokAwal = model.getValueAt(row, 4).toString();
+
+        JTextField tfNama = new JTextField(namaAwal);
+        JTextField tfHarga = new JTextField("Rp" + new DecimalFormat("#,###").format(Double.parseDouble(hargaAwal)));
+        JTextField tfStok = new JTextField(stokAwal);
+        formatRupiah(tfHarga);
+
+        JComboBox<String> cbKategori = new JComboBox<>();
+        loadKategori(cbKategori);
+
+        if (((DefaultComboBoxModel<String>) cbKategori.getModel()).getIndexOf(kategoriAwal) == -1) {
+            cbKategori.addItem(kategoriAwal);
+        }
+        cbKategori.setSelectedItem(kategoriAwal);
+
+        JButton btnPilihFoto = new JButton("Pilih Foto");
+        JLabel lblFoto = new JLabel("");
+        final String[] pathFoto = {null};
+
+        btnPilihFoto.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            int res = chooser.showOpenDialog(this);
+            if (res == JFileChooser.APPROVE_OPTION) {
+                File file = chooser.getSelectedFile();
+                pathFoto[0] = file.getAbsolutePath();
+                lblFoto.setText(file.getName());
+            }
+        });
+
+        Object[] message = {
+                "Nama Produk:", tfNama,
+                "Kategori:", cbKategori,
+                "Harga:", tfHarga,
+                "Stok:", tfStok,
+                btnPilihFoto, lblFoto
+        };
+
+        int option = JOptionPane.showConfirmDialog(this, message, "Edit Produk", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.OK_OPTION) {
+            try (Connection conn = Database.getConnection()) {
+                double harga = parseRupiah(tfHarga.getText());
+                int stok = Integer.parseInt(tfStok.getText());
+
+                String sql = "UPDATE produk SET nama_produk=?, kategori=?, harga=?, stok=?, foto=IFNULL(?, foto) WHERE id=?";
+                PreparedStatement pst = conn.prepareStatement(sql);
+                pst.setString(1, tfNama.getText().trim());
+                pst.setString(2, cbKategori.getSelectedItem().toString());
+                pst.setDouble(3, harga);
+                pst.setInt(4, stok);
+                pst.setString(5, pathFoto[0]);
+                pst.setInt(6, selectedId);
+                pst.executeUpdate();
+
+                JOptionPane.showMessageDialog(this, "Produk berhasil diupdate!");
+                loadData();
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Gagal update produk!\n" + e.getMessage());
+            }
+        }
     }
 
-    int row = table.getSelectedRow();
-    String namaAwal = model.getValueAt(row, 1).toString();
-    String kategoriAwal = model.getValueAt(row, 2).toString();
-    String hargaAwal = model.getValueAt(row, 3).toString().replaceAll("[^0-9]", "");
-    String stokAwal = model.getValueAt(row, 4).toString();
-
-    JTextField tfNama = new JTextField(namaAwal);
-    JTextField tfKategori = new JTextField(kategoriAwal); // kategori manual
-    JTextField tfHarga = new JTextField("Rp" + new DecimalFormat("#,###").format(Double.parseDouble(hargaAwal)));
-    JTextField tfStok = new JTextField(stokAwal);
-    formatRupiah(tfHarga);
-
-    JButton btnPilihFoto = new JButton("Pilih Foto");
-    JLabel lblFoto = new JLabel("");
-    final String[] pathFoto = {null};
-
-    btnPilihFoto.addActionListener(e -> {
-        JFileChooser chooser = new JFileChooser();
-        int res = chooser.showOpenDialog(this);
-        if (res == JFileChooser.APPROVE_OPTION) {
-            File file = chooser.getSelectedFile();
-            pathFoto[0] = file.getAbsolutePath();
-            lblFoto.setText(file.getName());
-        }
-    });
-
-    Object[] message = {
-        "Nama Produk:", tfNama,
-        "Kategori:", tfKategori,
-        "Harga:", tfHarga,
-        "Stok:", tfStok,    
-        btnPilihFoto, lblFoto
-    };
-
-    int option = JOptionPane.showConfirmDialog(this, message, "Edit Produk", JOptionPane.OK_CANCEL_OPTION);
-    if (option == JOptionPane.OK_OPTION) {
-        try (Connection conn = Database.getConnection()) {
-            double harga = parseRupiah(tfHarga.getText());
-            int stok = Integer.parseInt(tfStok.getText());
-
-            String sql = "UPDATE produk SET nama_produk=?, kategori=?, harga=?, stok=?, foto=IFNULL(?, foto) WHERE id=?";
-            PreparedStatement pst = conn.prepareStatement(sql);
-            pst.setString(1, tfNama.getText().trim());
-            pst.setString(2, tfKategori.getText().trim()); // manual input
-            pst.setDouble(3, harga);
-            pst.setInt(4, stok);
-            pst.setString(5, pathFoto[0]);
-            pst.setInt(6, selectedId);
-            pst.executeUpdate();
-
-            JOptionPane.showMessageDialog(this, "Produk berhasil diupdate!\nKode Produk: " + generateKodeProduk(selectedId));
-            loadData();
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Gagal update produk!\n" + e.getMessage());
-        }
-    }
-}
-
-
-    // ================= HAPUS PRODUK =================
     private void hapusProduk() {
         if (selectedId == null) {
             JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
@@ -493,7 +483,49 @@ private void editProduk() {
         }
     }
 
-    // ================= MAIN =================
+    private void loadKategori(JComboBox<String> combo) {
+        combo.removeAllItems();
+        try (Connection conn = Database.getConnection()) {
+            String sql = "SELECT DISTINCT kategori FROM produk ORDER BY kategori ASC";
+            Statement st = conn.createStatement();
+            ResultSet rs = st.executeQuery(sql);
+            while (rs.next()) {
+                String kat = rs.getString("kategori");
+                if (kat != null && !kat.trim().isEmpty()) {
+                    combo.addItem(kat);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private JButton createButton(String text, String iconPath, Color bgColor) {
+        ImageIcon icon = null;
+        try {
+            icon = new ImageIcon(getClass().getResource(iconPath));
+            Image img = icon.getImage().getScaledInstance(15, 15, Image.SCALE_SMOOTH);
+            icon = new ImageIcon(img);
+        } catch (Exception e) {
+            System.out.println("Gagal load icon: " + iconPath);
+        }
+
+        JButton btn = new JButton(text, icon);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btn.setBackground(bgColor);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.setHorizontalTextPosition(SwingConstants.RIGHT);
+        btn.setIconTextGap(10);
+
+        btn.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) { btn.setBackground(bgColor.darker()); }
+            public void mouseExited(java.awt.event.MouseEvent evt) { btn.setBackground(bgColor); }
+        });
+        return btn;
+    }
+
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new ManajemenProduk("Tester").setVisible(true));
     }
