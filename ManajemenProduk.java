@@ -70,20 +70,30 @@ public class ManajemenProduk extends JFrame {
         mainPanel.add(lblHeader, BorderLayout.NORTH);
 
         // ================= TABEL PRODUK =================
-        model = new DefaultTableModel(new String[]{"Kode Produk", "Nama Produk", "Kategori", "Harga", "Stok", "Foto"}, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) { return false; }
+model = new DefaultTableModel(
+    new String[]{"ID", "Kode Produk", "Nama Produk", "Kategori", "Harga", "Stok", "Foto"}, 0
+) {
+    @Override
+    public boolean isCellEditable(int row, int column) { return false; }
+    
+    @Override
+    public Class<?> getColumnClass(int columnIndex) {
+        if (columnIndex == 6) return ImageIcon.class; // foto
+        return Object.class;
+    }
+};
 
-            @Override
-            public Class<?> getColumnClass(int columnIndex) {
-                if (columnIndex == 5) return ImageIcon.class;
-                return Object.class;
-            }
-        };
         table = new JTable(model);
         table.setRowHeight(60);
         table.setSelectionBackground(new Color(52, 152, 219));
         table.setSelectionForeground(Color.WHITE);
+        
+TableColumn idCol = table.getColumnModel().getColumn(0);
+idCol.setMinWidth(0);
+idCol.setMaxWidth(0);
+idCol.setPreferredWidth(0);
+
+
 
         JScrollPane sp = new JScrollPane(table);
         sp.setBorder(BorderFactory.createLineBorder(new Color(0, 102, 204), 2, true));
@@ -197,7 +207,8 @@ public class ManajemenProduk extends JFrame {
         table.getSelectionModel().addListSelectionListener(e -> {
             int row = table.getSelectedRow();
             if (row != -1) {
-                selectedId = Integer.parseInt(getIdByRow(row));
+int modelRow = table.convertRowIndexToModel(row);
+selectedId = (int) model.getValueAt(modelRow, 0); // ID ada di kolom 0
                 selectedFoto = null;
             }
         });
@@ -238,7 +249,10 @@ private void loadData() {
         while (rs.next()) {
             int id = rs.getInt("id");
             String kategori = rs.getString("kategori");
-            String kode = rs.getString("kode"); // ambil langsung dari kolom 'kode'
+String kode = rs.getString("kode");
+if (kode == null || kode.trim().isEmpty()) {
+    kode = "-"; // fallback kalau database kosong
+}
             String fotoPath = rs.getString("foto");
             ImageIcon imgIcon = null;
             if (fotoPath != null && !fotoPath.isEmpty()) {
@@ -251,14 +265,15 @@ private void loadData() {
                 }
             }
 
-            model.addRow(new Object[]{
-                    kode,
-                    rs.getString("nama_produk"),
-                    kategori,
-                    new DecimalFormat("#,###").format(rs.getDouble("harga")),
-                    rs.getInt("stok"),
-                    imgIcon
-            });
+model.addRow(new Object[]{
+    id,                 // kolom 0
+    kode,               // kolom 1
+    rs.getString("nama_produk"), // kolom 2
+    kategori,           // kolom 3
+    new DecimalFormat("#,###").format(rs.getDouble("harga")), // kolom 4
+    rs.getInt("stok"),  // kolom 5
+    imgIcon             // kolom 6
+});
         }
     } catch (Exception e) {
         JOptionPane.showMessageDialog(this, "Gagal load data!\n" + e.getMessage());
@@ -266,44 +281,38 @@ private void loadData() {
 }
 
 private String generateKodeKategori(Connection conn, String kategori) throws SQLException {
-    // ambil 3 huruf pertama kategori, uppercase
+    // bikin prefix 3 huruf dari kategori, uppercase
     String prefix = kategori.toUpperCase().replaceAll("\\s+", "");
     prefix = prefix.length() >= 3 ? prefix.substring(0, 3) : prefix;
 
-    // cari nomor terakhir di kategori ini
-    String sql = "SELECT kode FROM produk WHERE kategori=? ORDER BY id ASC";
+    // cari kode dengan prefix sama, contoh: LAP%
+    String sql = "SELECT kode FROM produk WHERE kode LIKE ? ORDER BY kode DESC LIMIT 1";
     PreparedStatement pst = conn.prepareStatement(sql);
-    pst.setString(1, kategori);
+    pst.setString(1, prefix + "%");
     ResultSet rs = pst.executeQuery();
 
-    int maxNumber = 0;
-    while (rs.next()) {
-        String kode = rs.getString("kode");
-        if (kode != null && !kode.isEmpty()) {
-            String numPart = kode.replaceAll("[^0-9]", "");
-            if (!numPart.isEmpty()) {
-                int n = Integer.parseInt(numPart);
-                if (n > maxNumber) maxNumber = n;
-            }
-        }
+    int nextNum = 1;
+
+    if (rs.next()) {
+        String lastKode = rs.getString("kode");   // LAP005
+        String numberPart = lastKode.replaceAll("[^0-9]", ""); // 005
+        nextNum = Integer.parseInt(numberPart) + 1;
     }
 
-    int nextNumber = maxNumber + 1;
-    return String.format("%s%02d", prefix, nextNumber); // LAP01, LAP02, BAT01, BAT02
+    return String.format("%s%03d", prefix, nextNum);
 }
 
-    private int getNextAvailableId(Connection conn) throws SQLException {
-        String sql = "SELECT id FROM produk ORDER BY id ASC";
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(sql);
-        int expected = 1;
-        while (rs.next()) {
-            int id = rs.getInt("id");
-            if (id != expected) return expected;
-            expected++;
-        }
-        return expected;
+private int getNextIdByKategori(Connection conn, String kategori) throws SQLException {
+    String sql = "SELECT id FROM produk WHERE kategori=? ORDER BY id DESC LIMIT 1";
+    PreparedStatement pst = conn.prepareStatement(sql);
+    pst.setString(1, kategori);
+
+    ResultSet rs = pst.executeQuery();
+    if (rs.next()) {
+        return rs.getInt("id") + 1;
     }
+    return 1; // kalau kategori ini belum ada, mulai dari 1
+}
 
     private String getIdByRow(int row) {
         try (Connection conn = Database.getConnection()) {
@@ -357,7 +366,8 @@ private void tambahProduk() {
     int option = JOptionPane.showConfirmDialog(this, message, "Tambah Produk", JOptionPane.OK_CANCEL_OPTION);
     if (option == JOptionPane.OK_OPTION) {
         try (Connection conn = Database.getConnection()) {
-            int newId = getNextAvailableId(conn);
+String kategoriDipilih = cbKategori.getSelectedItem().toString();
+int newId = getNextIdByKategori(conn, kategoriDipilih);
             double harga = parseRupiah(tfHarga.getText());
             int stok = Integer.parseInt(tfStok.getText());
 
@@ -385,18 +395,24 @@ private void tambahProduk() {
     }
 }
 
+private void editProduk() {
+    if (selectedId == null) {
+        JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
+        return;
+    }
 
-    private void editProduk() {
-        if (selectedId == null) {
-            JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
-            return;
-        }
+    int row = table.getSelectedRow(); 
+    if (row == -1) {
+        JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
+        return;
+    }
 
-        int row = table.getSelectedRow();
-        String namaAwal = model.getValueAt(row, 1).toString();
-        String kategoriAwal = model.getValueAt(row, 2).toString();
-        String hargaAwal = model.getValueAt(row, 3).toString().replaceAll("[^0-9]", "");
-        String stokAwal = model.getValueAt(row, 4).toString();
+    int m = table.convertRowIndexToModel(row);
+
+    String namaAwal     = model.getValueAt(m, 2).toString();
+    String kategoriAwal = model.getValueAt(m, 3).toString();
+    String hargaAwal    = model.getValueAt(m, 4).toString().replaceAll("[^0-9]", "");
+    String stokAwal     = model.getValueAt(m, 5).toString();
 
         JTextField tfNama = new JTextField(namaAwal);
         JTextField tfHarga = new JTextField("Rp" + new DecimalFormat("#,###").format(Double.parseDouble(hargaAwal)));
