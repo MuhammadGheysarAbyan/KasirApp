@@ -7,6 +7,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.sql.*;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 
 public class ManajemenProduk extends JFrame {
     private JTable table;
@@ -15,6 +16,7 @@ public class ManajemenProduk extends JFrame {
     private String selectedFoto = null;
     private String admin;
     private String shift = "Shift 1"; // default shift
+    private DecimalFormat df;
 
     // ================= FORMAT RUPIAH =================
     private void formatRupiah(JTextField field) {
@@ -26,19 +28,20 @@ public class ManajemenProduk extends JFrame {
                     return;
                 }
                 try {
-                    double value = Double.parseDouble(text);
-                    java.text.NumberFormat format = java.text.NumberFormat.getCurrencyInstance(new java.util.Locale("id", "ID"));
-                    field.setText(format.format(value).replace(",00", ""));
-                } catch (Exception ex) { }
+                    long value = Long.parseLong(text);
+                    field.setText(df.format(value));
+                } catch (Exception ex) { 
+                    field.setText("");
+                }
             }
         });
     }
 
-    private double parseRupiah(String text) {
+    private long parseRupiah(String text) {
         if (text == null || text.isEmpty()) return 0;
         text = text.replaceAll("[^0-9]", "");
         if (text.isEmpty()) return 0;
-        return Double.parseDouble(text);
+        return Long.parseLong(text);
     }
 
     public ManajemenProduk() {
@@ -47,6 +50,12 @@ public class ManajemenProduk extends JFrame {
 
     public ManajemenProduk(String admin) {
         this.admin = admin;
+
+        // Setup format angka
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols();
+        symbols.setGroupingSeparator('.');
+        symbols.setDecimalSeparator(',');
+        df = new DecimalFormat("#,###", symbols);
 
         setTitle("📦 Manajemen Produk - " + admin);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
@@ -70,30 +79,29 @@ public class ManajemenProduk extends JFrame {
         mainPanel.add(lblHeader, BorderLayout.NORTH);
 
         // ================= TABEL PRODUK =================
-model = new DefaultTableModel(
-    new String[]{"ID", "Kode Produk", "Nama Produk", "Kategori", "Harga", "Stok", "Foto"}, 0
-) {
-    @Override
-    public boolean isCellEditable(int row, int column) { return false; }
-    
-    @Override
-    public Class<?> getColumnClass(int columnIndex) {
-        if (columnIndex == 6) return ImageIcon.class; // foto
-        return Object.class;
-    }
-};
+        model = new DefaultTableModel(
+            new String[]{"ID", "Kode Produk", "Nama Produk", "Kategori", "Harga", "Stok", "Foto"}, 0
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+            
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                if (columnIndex == 6) return ImageIcon.class; // foto
+                return Object.class;
+            }
+        };
 
         table = new JTable(model);
         table.setRowHeight(60);
         table.setSelectionBackground(new Color(52, 152, 219));
         table.setSelectionForeground(Color.WHITE);
         
-TableColumn idCol = table.getColumnModel().getColumn(0);
-idCol.setMinWidth(0);
-idCol.setMaxWidth(0);
-idCol.setPreferredWidth(0);
-
-
+        // Sembunyikan kolom ID
+        TableColumn idCol = table.getColumnModel().getColumn(0);
+        idCol.setMinWidth(0);
+        idCol.setMaxWidth(0);
+        idCol.setPreferredWidth(0);
 
         JScrollPane sp = new JScrollPane(table);
         sp.setBorder(BorderFactory.createLineBorder(new Color(0, 102, 204), 2, true));
@@ -157,7 +165,7 @@ idCol.setPreferredWidth(0);
             if (text.isEmpty()) {
                 sorter.setRowFilter(null);
             } else {
-                sorter.setRowFilter(RowFilter.regexFilter("(?i)" + text, 1, 2));
+                sorter.setRowFilter(RowFilter.regexFilter("(?i)" + text, 1, 2, 3)); // Filter by kode, nama, kategori
             }
         };
 
@@ -205,11 +213,13 @@ idCol.setPreferredWidth(0);
         btnKelolaKategori.addActionListener(e -> new KelolaKategoriDialog(this).setVisible(true));
 
         table.getSelectionModel().addListSelectionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row != -1) {
-int modelRow = table.convertRowIndexToModel(row);
-selectedId = (int) model.getValueAt(modelRow, 0); // ID ada di kolom 0
-                selectedFoto = null;
+            if (!e.getValueIsAdjusting()) {
+                int row = table.getSelectedRow();
+                if (row != -1) {
+                    int modelRow = table.convertRowIndexToModel(row);
+                    selectedId = (Integer) model.getValueAt(modelRow, 0); // ID ada di kolom 0
+                    selectedFoto = null;
+                }
             }
         });
     }
@@ -238,193 +248,174 @@ selectedId = (int) model.getValueAt(modelRow, 0); // ID ada di kolom 0
         lblHeader.setBorder(BorderFactory.createEmptyBorder(15, 0, 15, 0));
         return lblHeader;
     }
-private void loadData() {
-    model.setRowCount(0);
-    selectedId = null;
-    try (Connection conn = Database.getConnection()) {
-        // urut per kategori, lalu id
-        String sql = "SELECT * FROM produk ORDER BY kategori ASC, id ASC";
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(sql);
-        while (rs.next()) {
-            int id = rs.getInt("id");
-            String kategori = rs.getString("kategori");
-String kode = rs.getString("kode");
-if (kode == null || kode.trim().isEmpty()) {
-    kode = "-"; // fallback kalau database kosong
-}
-            String fotoPath = rs.getString("foto");
-            ImageIcon imgIcon = null;
-            if (fotoPath != null && !fotoPath.isEmpty()) {
-                try {
-                    Image img = new ImageIcon(fotoPath).getImage()
-                            .getScaledInstance(50, 50, Image.SCALE_SMOOTH);
-                    imgIcon = new ImageIcon(img);
-                } catch (Exception ex) {
-                    System.out.println("Gagal load foto: " + fotoPath);
-                }
-            }
 
-model.addRow(new Object[]{
-    id,                 // kolom 0
-    kode,               // kolom 1
-    rs.getString("nama_produk"), // kolom 2
-    kategori,           // kolom 3
-    new DecimalFormat("#,###").format(rs.getDouble("harga")), // kolom 4
-    rs.getInt("stok"),  // kolom 5
-    imgIcon             // kolom 6
-});
-        }
-    } catch (Exception e) {
-        JOptionPane.showMessageDialog(this, "Gagal load data!\n" + e.getMessage());
-    }
-}
-
-private String generateKodeKategori(Connection conn, String kategori) throws SQLException {
-    // bikin prefix 3 huruf dari kategori, uppercase
-    String prefix = kategori.toUpperCase().replaceAll("\\s+", "");
-    prefix = prefix.length() >= 3 ? prefix.substring(0, 3) : prefix;
-
-    // cari kode dengan prefix sama, contoh: LAP%
-    String sql = "SELECT kode FROM produk WHERE kode LIKE ? ORDER BY kode DESC LIMIT 1";
-    PreparedStatement pst = conn.prepareStatement(sql);
-    pst.setString(1, prefix + "%");
-    ResultSet rs = pst.executeQuery();
-
-    int nextNum = 1;
-
-    if (rs.next()) {
-        String lastKode = rs.getString("kode");   // LAP005
-        String numberPart = lastKode.replaceAll("[^0-9]", ""); // 005
-        nextNum = Integer.parseInt(numberPart) + 1;
-    }
-
-    return String.format("%s%03d", prefix, nextNum);
-}
-
-private int getNextIdByKategori(Connection conn, String kategori) throws SQLException {
-    String sql = "SELECT id FROM produk WHERE kategori=? ORDER BY id DESC LIMIT 1";
-    PreparedStatement pst = conn.prepareStatement(sql);
-    pst.setString(1, kategori);
-
-    ResultSet rs = pst.executeQuery();
-    if (rs.next()) {
-        return rs.getInt("id") + 1;
-    }
-    return 1; // kalau kategori ini belum ada, mulai dari 1
-}
-
-    private String getIdByRow(int row) {
+    private void loadData() {
+        model.setRowCount(0);
+        selectedId = null;
         try (Connection conn = Database.getConnection()) {
-            String kode = model.getValueAt(row, 0).toString();
+            // Query yang sesuai dengan struktur database
+            String sql = "SELECT p.id, p.kode, p.nama_produk, k.nama_kategori, p.harga, p.stok, p.foto " +
+                        "FROM produk p " +
+                        "LEFT JOIN kategori k ON p.kategori_id = k.id " +
+                        "ORDER BY k.nama_kategori ASC, p.id ASC";
             Statement st = conn.createStatement();
-            ResultSet rs = st.executeQuery("SELECT id, kategori FROM produk ORDER BY id DESC");
+            ResultSet rs = st.executeQuery(sql);
+            
             while (rs.next()) {
                 int id = rs.getInt("id");
-                String kategori = rs.getString("kategori");
-                if (generateKodeKategori(conn, kategori).equals(kode)) {
-                    return String.valueOf(id);
+                String kode = rs.getString("kode");
+                if (kode == null || kode.trim().isEmpty()) {
+                    kode = "-";
                 }
+                String kategori = rs.getString("nama_kategori");
+                if (kategori == null) {
+                    kategori = "Tanpa Kategori";
+                }
+                
+                String fotoPath = rs.getString("foto");
+                ImageIcon imgIcon = null;
+                if (fotoPath != null && !fotoPath.isEmpty()) {
+                    try {
+                        Image img = new ImageIcon(fotoPath).getImage()
+                                .getScaledInstance(50, 50, Image.SCALE_SMOOTH);
+                        imgIcon = new ImageIcon(img);
+                    } catch (Exception ex) {
+                        System.out.println("Gagal load foto: " + fotoPath);
+                    }
+                }
+
+                model.addRow(new Object[]{
+                    id,                 // kolom 0 - ID
+                    kode,               // kolom 1 - Kode Produk
+                    rs.getString("nama_produk"), // kolom 2 - Nama Produk
+                    kategori,           // kolom 3 - Kategori
+                    "Rp " + df.format(rs.getLong("harga")), // kolom 4 - Harga
+                    rs.getInt("stok"),  // kolom 5 - Stok
+                    imgIcon             // kolom 6 - Foto
+                });
             }
         } catch (Exception e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Gagal load data!\n" + e.getMessage());
         }
-        return null;
     }
 
-private void tambahProduk() {
-    JTextField tfNama = new JTextField();
-    JTextField tfHarga = new JTextField();
-    JTextField tfStok = new JTextField();
-    formatRupiah(tfHarga);
+    private String generateKodeProduk(Connection conn) throws SQLException {
+        // Generate kode format: PRO-001, PRO-002, dst
+        String sql = "SELECT kode FROM produk ORDER BY id DESC LIMIT 1";
+        PreparedStatement pst = conn.prepareStatement(sql);
+        ResultSet rs = pst.executeQuery();
 
-    JComboBox<String> cbKategori = new JComboBox<>();
-    loadKategori(cbKategori);
-
-    JButton btnPilihFoto = new JButton("Pilih Foto");
-    JLabel lblFoto = new JLabel("");
-    final String[] pathFoto = {null};
-
-    btnPilihFoto.addActionListener(e -> {
-        JFileChooser chooser = new JFileChooser();
-        int res = chooser.showOpenDialog(this);
-        if (res == JFileChooser.APPROVE_OPTION) {
-            File file = chooser.getSelectedFile();
-            pathFoto[0] = file.getAbsolutePath();
-            lblFoto.setText(file.getName());
+        int nextNum = 1;
+        if (rs.next()) {
+            String lastKode = rs.getString("kode");
+            if (lastKode != null && lastKode.startsWith("PRO-")) {
+                try {
+                    String numberPart = lastKode.substring(4);
+                    nextNum = Integer.parseInt(numberPart) + 1;
+                } catch (NumberFormatException e) {
+                    // Jika format tidak sesuai, lanjutkan dengan angka berikutnya
+                }
+            }
         }
-    });
+        return String.format("PRO-%03d", nextNum);
+    }
 
-    Object[] message = {
+    private void tambahProduk() {
+        JTextField tfNama = new JTextField();
+        JTextField tfHarga = new JTextField();
+        JTextField tfStok = new JTextField();
+        formatRupiah(tfHarga);
+
+        JComboBox<String> cbKategori = new JComboBox<>();
+        loadKategoriFromDatabase(cbKategori);
+
+        JButton btnPilihFoto = new JButton("Pilih Foto");
+        JLabel lblFoto = new JLabel("");
+        final String[] pathFoto = {null};
+
+        btnPilihFoto.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            int res = chooser.showOpenDialog(this);
+            if (res == JFileChooser.APPROVE_OPTION) {
+                File file = chooser.getSelectedFile();
+                pathFoto[0] = file.getAbsolutePath();
+                lblFoto.setText(file.getName());
+            }
+        });
+
+        Object[] message = {
             "Nama Produk:", tfNama,
             "Kategori:", cbKategori,
             "Harga:", tfHarga,
             "Stok:", tfStok,
-            btnPilihFoto, lblFoto
-    };
+            "Foto:", btnPilihFoto, lblFoto
+        };
 
-    int option = JOptionPane.showConfirmDialog(this, message, "Tambah Produk", JOptionPane.OK_CANCEL_OPTION);
-    if (option == JOptionPane.OK_OPTION) {
-        try (Connection conn = Database.getConnection()) {
-String kategoriDipilih = cbKategori.getSelectedItem().toString();
-int newId = getNextIdByKategori(conn, kategoriDipilih);
-            double harga = parseRupiah(tfHarga.getText());
-            int stok = Integer.parseInt(tfStok.getText());
+        int option = JOptionPane.showConfirmDialog(this, message, "Tambah Produk", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.OK_OPTION) {
+            if (tfNama.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Nama produk harus diisi!");
+                return;
+            }
 
-            // ================= generate kode =================
-            String kategori = cbKategori.getSelectedItem().toString();
-            String kodeBaru = generateKodeKategori(conn, kategori);
+            try (Connection conn = Database.getConnection()) {
+                // Generate kode produk
+                String kodeBaru = generateKodeProduk(conn);
+                
+                // Get kategori_id dari kategori yang dipilih
+                String kategoriNama = cbKategori.getSelectedItem().toString();
+                int kategoriId = getKategoriIdByName(conn, kategoriNama);
 
-            // ================= simpan ke database =================
-            String sql = "INSERT INTO produk (id, kode, nama_produk, kategori, harga, stok, foto) VALUES (?,?,?,?,?,?,?)";
-            PreparedStatement pst = conn.prepareStatement(sql);
-            pst.setInt(1, newId);
-            pst.setString(2, kodeBaru); // simpan kode
-            pst.setString(3, tfNama.getText().trim());
-            pst.setString(4, kategori);
-            pst.setDouble(5, harga);
-            pst.setInt(6, stok);
-            pst.setString(7, pathFoto[0]);
-            pst.executeUpdate();
+                long harga = parseRupiah(tfHarga.getText());
+                int stok = Integer.parseInt(tfStok.getText());
 
-            JOptionPane.showMessageDialog(this, "Produk berhasil ditambahkan!");
-            loadData();
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Gagal tambah produk!\n" + e.getMessage());
+                // Insert ke database
+                String sql = "INSERT INTO produk (kode, nama_produk, kategori_id, harga, stok, foto) VALUES (?, ?, ?, ?, ?, ?)";
+                PreparedStatement pst = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+                pst.setString(1, kodeBaru);
+                pst.setString(2, tfNama.getText().trim());
+                pst.setInt(3, kategoriId);
+                pst.setLong(4, harga);
+                pst.setInt(5, stok);
+                pst.setString(6, pathFoto[0]);
+                pst.executeUpdate();
+
+                JOptionPane.showMessageDialog(this, "Produk berhasil ditambahkan!\nKode: " + kodeBaru);
+                loadData();
+            } catch (Exception e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Gagal tambah produk!\n" + e.getMessage());
+            }
         }
     }
-}
 
-private void editProduk() {
-    if (selectedId == null) {
-        JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
-        return;
-    }
+    private void editProduk() {
+        if (selectedId == null) {
+            JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
+            return;
+        }
 
-    int row = table.getSelectedRow(); 
-    if (row == -1) {
-        JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
-        return;
-    }
+        int row = table.getSelectedRow(); 
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
+            return;
+        }
 
-    int m = table.convertRowIndexToModel(row);
+        int modelRow = table.convertRowIndexToModel(row);
 
-    String namaAwal     = model.getValueAt(m, 2).toString();
-    String kategoriAwal = model.getValueAt(m, 3).toString();
-    String hargaAwal    = model.getValueAt(m, 4).toString().replaceAll("[^0-9]", "");
-    String stokAwal     = model.getValueAt(m, 5).toString();
+        String namaAwal = model.getValueAt(modelRow, 2).toString();
+        String kategoriAwal = model.getValueAt(modelRow, 3).toString();
+        String hargaAwal = model.getValueAt(modelRow, 4).toString().replace("Rp ", "").replaceAll("[^0-9]", "");
+        String stokAwal = model.getValueAt(modelRow, 5).toString();
 
         JTextField tfNama = new JTextField(namaAwal);
-        JTextField tfHarga = new JTextField("Rp" + new DecimalFormat("#,###").format(Double.parseDouble(hargaAwal)));
+        JTextField tfHarga = new JTextField(hargaAwal);
         JTextField tfStok = new JTextField(stokAwal);
         formatRupiah(tfHarga);
 
         JComboBox<String> cbKategori = new JComboBox<>();
-        loadKategori(cbKategori);
-
-        if (((DefaultComboBoxModel<String>) cbKategori.getModel()).getIndexOf(kategoriAwal) == -1) {
-            cbKategori.addItem(kategoriAwal);
-        }
+        loadKategoriFromDatabase(cbKategori);
         cbKategori.setSelectedItem(kategoriAwal);
 
         JButton btnPilihFoto = new JButton("Pilih Foto");
@@ -442,24 +433,33 @@ private void editProduk() {
         });
 
         Object[] message = {
-                "Nama Produk:", tfNama,
-                "Kategori:", cbKategori,
-                "Harga:", tfHarga,
-                "Stok:", tfStok,
-                btnPilihFoto, lblFoto
+            "Nama Produk:", tfNama,
+            "Kategori:", cbKategori,
+            "Harga:", tfHarga,
+            "Stok:", tfStok,
+            "Foto:", btnPilihFoto, lblFoto
         };
 
         int option = JOptionPane.showConfirmDialog(this, message, "Edit Produk", JOptionPane.OK_CANCEL_OPTION);
         if (option == JOptionPane.OK_OPTION) {
-            try (Connection conn = Database.getConnection()) {
-                double harga = parseRupiah(tfHarga.getText());
-                int stok = Integer.parseInt(tfStok.getText());
+            if (tfNama.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Nama produk harus diisi!");
+                return;
+            }
 
-                String sql = "UPDATE produk SET nama_produk=?, kategori=?, harga=?, stok=?, foto=IFNULL(?, foto) WHERE id=?";
+            try (Connection conn = Database.getConnection()) {
+                long harga = parseRupiah(tfHarga.getText());
+                int stok = Integer.parseInt(tfStok.getText());
+                
+                // Get kategori_id dari kategori yang dipilih
+                String kategoriNama = cbKategori.getSelectedItem().toString();
+                int kategoriId = getKategoriIdByName(conn, kategoriNama);
+
+                String sql = "UPDATE produk SET nama_produk=?, kategori_id=?, harga=?, stok=?, foto=COALESCE(?, foto) WHERE id=?";
                 PreparedStatement pst = conn.prepareStatement(sql);
                 pst.setString(1, tfNama.getText().trim());
-                pst.setString(2, cbKategori.getSelectedItem().toString());
-                pst.setDouble(3, harga);
+                pst.setInt(2, kategoriId);
+                pst.setLong(3, harga);
                 pst.setInt(4, stok);
                 pst.setString(5, pathFoto[0]);
                 pst.setInt(6, selectedId);
@@ -468,6 +468,7 @@ private void editProduk() {
                 JOptionPane.showMessageDialog(this, "Produk berhasil diupdate!");
                 loadData();
             } catch (Exception e) {
+                e.printStackTrace();
                 JOptionPane.showMessageDialog(this, "Gagal update produk!\n" + e.getMessage());
             }
         }
@@ -478,42 +479,87 @@ private void editProduk() {
             JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
             return;
         }
-        int confirm = JOptionPane.showConfirmDialog(this, "Hapus produk ini?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Apakah Anda yakin ingin menghapus produk ini?", 
+            "Konfirmasi Hapus", 
+            JOptionPane.YES_NO_OPTION
+        );
+        
         if (confirm != JOptionPane.YES_OPTION) return;
 
         try (Connection conn = Database.getConnection()) {
-            String sql = "DELETE FROM produk WHERE id=?";
-            PreparedStatement pst = conn.prepareStatement(sql);
-            pst.setInt(1, selectedId);
-            pst.executeUpdate();
-            JOptionPane.showMessageDialog(this, "Produk berhasil dihapus!");
-            loadData();
-        } catch (SQLIntegrityConstraintViolationException fkEx) {
-            JOptionPane.showMessageDialog(this,
-                    "❌ Produk ini sudah pernah dipakai di transaksi.\nTidak bisa dihapus untuk menjaga riwayat penjualan.",
+            // Cek apakah produk pernah digunakan di transaksi
+            String checkSql = "SELECT COUNT(*) FROM detail_transaksi WHERE produk_id = ?";
+            PreparedStatement checkStmt = conn.prepareStatement(checkSql);
+            checkStmt.setInt(1, selectedId);
+            ResultSet rs = checkStmt.executeQuery();
+            
+            if (rs.next() && rs.getInt(1) > 0) {
+                JOptionPane.showMessageDialog(this,
+                    "❌ Produk ini sudah pernah digunakan dalam transaksi.\nTidak dapat dihapus untuk menjaga integritas data.",
                     "Produk Terpakai",
                     JOptionPane.WARNING_MESSAGE
-            );
+                );
+                return;
+            }
+
+            // Hapus produk
+            String sql = "DELETE FROM produk WHERE id = ?";
+            PreparedStatement pst = conn.prepareStatement(sql);
+            pst.setInt(1, selectedId);
+            int affectedRows = pst.executeUpdate();
+            
+            if (affectedRows > 0) {
+                JOptionPane.showMessageDialog(this, "Produk berhasil dihapus!");
+                loadData();
+            }
         } catch (Exception e) {
+            e.printStackTrace();
             JOptionPane.showMessageDialog(this, "Gagal hapus produk!\n" + e.getMessage());
         }
     }
 
-    private void loadKategori(JComboBox<String> combo) {
+    private void loadKategoriFromDatabase(JComboBox<String> combo) {
         combo.removeAllItems();
         try (Connection conn = Database.getConnection()) {
-            String sql = "SELECT DISTINCT kategori FROM produk ORDER BY kategori ASC";
+            String sql = "SELECT id, nama_kategori FROM kategori ORDER BY nama_kategori ASC";
             Statement st = conn.createStatement();
             ResultSet rs = st.executeQuery(sql);
             while (rs.next()) {
-                String kat = rs.getString("kategori");
-                if (kat != null && !kat.trim().isEmpty()) {
-                    combo.addItem(kat);
-                }
+                combo.addItem(rs.getString("nama_kategori"));
+            }
+            // Tambah default jika tidak ada kategori
+            if (combo.getItemCount() == 0) {
+                combo.addItem("Umum");
             }
         } catch (Exception e) {
             e.printStackTrace();
+            combo.addItem("Umum");
         }
+    }
+
+    private int getKategoriIdByName(Connection conn, String kategoriName) throws SQLException {
+        String sql = "SELECT id FROM kategori WHERE nama_kategori = ?";
+        PreparedStatement pst = conn.prepareStatement(sql);
+        pst.setString(1, kategoriName);
+        ResultSet rs = pst.executeQuery();
+        
+        if (rs.next()) {
+            return rs.getInt("id");
+        } else {
+            // Jika kategori tidak ditemukan, buat kategori baru
+            String insertSql = "INSERT INTO kategori (nama_kategori) VALUES (?)";
+            PreparedStatement insertStmt = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS);
+            insertStmt.setString(1, kategoriName);
+            insertStmt.executeUpdate();
+            
+            ResultSet generatedKeys = insertStmt.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                return generatedKeys.getInt(1);
+            }
+        }
+        return 1; // Default ke kategori pertama
     }
 
     private JButton createButton(String text, String iconPath, Color bgColor) {
@@ -543,6 +589,6 @@ private void editProduk() {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new ManajemenProduk("Tester").setVisible(true));
+        SwingUtilities.invokeLater(() -> new ManajemenProduk("Admin").setVisible(true));
     }
 }
