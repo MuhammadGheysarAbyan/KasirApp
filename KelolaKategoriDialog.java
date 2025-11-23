@@ -1,144 +1,168 @@
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.table.*;
 import java.awt.*;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class KelolaKategoriDialog extends JDialog {
     private JTable table;
     private DefaultTableModel model;
+    private Integer selectedId = null;
+    private ManajemenProduk parent;
 
-    public KelolaKategoriDialog(JFrame parent) {
+    public KelolaKategoriDialog(ManajemenProduk parent) {
         super(parent, "Kelola Kategori", true);
-        setSize(400, 450);
+        this.parent = parent;
+        setSize(500, 400);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout(10, 10));
 
-        model = new DefaultTableModel(new String[]{"Kategori"}, 0) {
-            public boolean isCellEditable(int r, int c) { return false; }
+        // Model tabel
+        model = new DefaultTableModel(new String[]{"ID", "Nama Kategori"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
         };
 
         table = new JTable(model);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        table.setRowHeight(30);
+        
+        // Sembunyikan kolom ID
+        table.getColumnModel().getColumn(0).setMinWidth(0);
+        table.getColumnModel().getColumn(0).setMaxWidth(0);
+        table.getColumnModel().getColumn(0).setPreferredWidth(0);
 
-        loadKategori();
+        JScrollPane scrollPane = new JScrollPane(table);
+        add(scrollPane, BorderLayout.CENTER);
 
-        JPanel panelBtn = new JPanel(new FlowLayout());
+        // Panel tombol
+        JPanel buttonPanel = new JPanel(new FlowLayout());
         JButton btnTambah = new JButton("Tambah");
         JButton btnEdit = new JButton("Edit");
         JButton btnHapus = new JButton("Hapus");
+        JButton btnTutup = new JButton("Tutup");
 
-        panelBtn.add(btnTambah);
-        panelBtn.add(btnEdit);
-        panelBtn.add(btnHapus);
+        buttonPanel.add(btnTambah);
+        buttonPanel.add(btnEdit);
+        buttonPanel.add(btnHapus);
+        buttonPanel.add(btnTutup);
+        add(buttonPanel, BorderLayout.SOUTH);
 
-        add(panelBtn, BorderLayout.SOUTH);
+        // Load data
+        loadData();
 
-        // ACTION: Tambah Kategori
+        // Event handlers
         btnTambah.addActionListener(e -> tambahKategori());
-
-        // ACTION: Edit Kategori
         btnEdit.addActionListener(e -> editKategori());
-
-        // ACTION: Hapus Kategori
         btnHapus.addActionListener(e -> hapusKategori());
+        btnTutup.addActionListener(e -> dispose());
+
+        table.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                int row = table.getSelectedRow();
+                if (row != -1) {
+                    selectedId = (Integer) model.getValueAt(row, 0);
+                }
+            }
+        });
     }
 
-    // LOAD KATEGORI
-    private void loadKategori() {
+    private void loadData() {
         model.setRowCount(0);
         try (Connection conn = Database.getConnection()) {
-            ResultSet rs = conn.createStatement().executeQuery(
-                "SELECT DISTINCT kategori FROM produk ORDER BY kategori ASC");
+            String sql = "SELECT id, nama_kategori FROM kategori ORDER BY nama_kategori";
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            
             while (rs.next()) {
-                model.addRow(new Object[]{rs.getString("kategori")});
+                model.addRow(new Object[]{
+                    rs.getInt("id"),
+                    rs.getString("nama_kategori")
+                });
             }
-        } catch (Exception e) {
+        } catch (SQLException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Gagal memuat data kategori!");
         }
     }
 
-    // TAMBAH KATEGORI
     private void tambahKategori() {
-        String nama = JOptionPane.showInputDialog(this, "Nama kategori baru:");
-        if (nama == null || nama.trim().isEmpty()) return;
-
-        try (Connection conn = Database.getConnection()) {
-            String sql = "INSERT INTO produk (kategori) VALUES (?)";
-            PreparedStatement pst = conn.prepareStatement(sql);
-            pst.setString(1, nama.trim());
-            pst.executeUpdate();
-        } catch (Exception e) {
-            // abaikan kalau kategori tidak punya data produk
+        String nama = JOptionPane.showInputDialog(this, "Masukkan nama kategori:");
+        if (nama != null && !nama.trim().isEmpty()) {
+            try (Connection conn = Database.getConnection()) {
+                String sql = "INSERT INTO kategori (nama_kategori) VALUES (?)";
+                PreparedStatement pstmt = conn.prepareStatement(sql);
+                pstmt.setString(1, nama.trim());
+                pstmt.executeUpdate();
+                
+                JOptionPane.showMessageDialog(this, "Kategori berhasil ditambahkan!");
+                loadData();
+            } catch (SQLException e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Gagal menambah kategori!");
+            }
         }
-        loadKategori();
     }
 
-    // EDIT KATEGORI
     private void editKategori() {
-        int row = table.getSelectedRow();
-        if (row == -1) {
-            JOptionPane.showMessageDialog(this, "Pilih kategori dulu!");
+        if (selectedId == null) {
+            JOptionPane.showMessageDialog(this, "Pilih kategori yang akan diedit!");
             return;
         }
 
-        String oldName = model.getValueAt(row, 0).toString();
-        String newName = JOptionPane.showInputDialog(this, "Ganti nama kategori:", oldName);
-
-        if (newName == null || newName.trim().isEmpty()) return;
-
-        try (Connection conn = Database.getConnection()) {
-            PreparedStatement pst = conn.prepareStatement(
-                "UPDATE produk SET kategori=? WHERE kategori=?");
-            pst.setString(1, newName.trim());
-            pst.setString(2, oldName);
-            pst.executeUpdate();
-
-            JOptionPane.showMessageDialog(this, "Kategori berhasil diubah!");
-            loadKategori();
-
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Gagal edit kategori!\n" + e.getMessage());
+        String namaLama = (String) model.getValueAt(table.getSelectedRow(), 1);
+        String namaBaru = JOptionPane.showInputDialog(this, "Edit nama kategori:", namaLama);
+        
+        if (namaBaru != null && !namaBaru.trim().isEmpty()) {
+            try (Connection conn = Database.getConnection()) {
+                String sql = "UPDATE kategori SET nama_kategori = ? WHERE id = ?";
+                PreparedStatement pstmt = conn.prepareStatement(sql);
+                pstmt.setString(1, namaBaru.trim());
+                pstmt.setInt(2, selectedId);
+                pstmt.executeUpdate();
+                
+                JOptionPane.showMessageDialog(this, "Kategori berhasil diupdate!");
+                loadData();
+            } catch (SQLException e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Gagal mengupdate kategori!");
+            }
         }
     }
 
-    // HAPUS KATEGORI
     private void hapusKategori() {
-        int row = table.getSelectedRow();
-        if (row == -1) {
-            JOptionPane.showMessageDialog(this, "Pilih kategori dulu!");
+        if (selectedId == null) {
+            JOptionPane.showMessageDialog(this, "Pilih kategori yang akan dihapus!");
             return;
         }
 
-        String kategori = model.getValueAt(row, 0).toString();
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Apakah Anda yakin ingin menghapus kategori ini?\nProduk dengan kategori ini akan menjadi tanpa kategori.",
+            "Konfirmasi Hapus",
+            JOptionPane.YES_NO_OPTION
+        );
 
-        try (Connection conn = Database.getConnection()) {
-            ResultSet rs = conn.createStatement().executeQuery(
-                "SELECT COUNT(*) FROM produk WHERE kategori='" + kategori + "'");
+        if (confirm == JOptionPane.YES_OPTION) {
+            try (Connection conn = Database.getConnection()) {
+                // Update produk yang menggunakan kategori ini menjadi tanpa kategori
+                String updateSql = "UPDATE produk SET kategori_id = NULL WHERE kategori_id = ?";
+                PreparedStatement updateStmt = conn.prepareStatement(updateSql);
+                updateStmt.setInt(1, selectedId);
+                updateStmt.executeUpdate();
 
-            rs.next();
-            if (rs.getInt(1) > 0) {
-                JOptionPane.showMessageDialog(this,
-                    "Kategori masih digunakan produk!\nTidak bisa dihapus.",
-                    "Tidak Bisa Hapus",
-                    JOptionPane.WARNING_MESSAGE
-                );
-                return;
+                // Hapus kategori
+                String deleteSql = "DELETE FROM kategori WHERE id = ?";
+                PreparedStatement deleteStmt = conn.prepareStatement(deleteSql);
+                deleteStmt.setInt(1, selectedId);
+                deleteStmt.executeUpdate();
+                
+                JOptionPane.showMessageDialog(this, "Kategori berhasil dihapus!");
+                loadData();
+                selectedId = null;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Gagal menghapus kategori!");
             }
-
-            int confirm = JOptionPane.showConfirmDialog(this,
-                    "Yakin hapus kategori?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
-
-            if (confirm == JOptionPane.YES_OPTION) {
-                PreparedStatement pst = conn.prepareStatement(
-                    "DELETE FROM kategori WHERE nama=?");
-                pst.setString(1, kategori);
-                pst.executeUpdate();
-                loadKategori();
-            }
-
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Gagal hapus kategori!\n" + e.getMessage());
         }
     }
 }

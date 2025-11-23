@@ -69,22 +69,24 @@ public class RiwayatTransaksi extends JFrame {
         sampaiTanggal.setEditor(new JSpinner.DateEditor(sampaiTanggal, "yyyy-MM-dd"));
 
         JButton btnFilter = createButton("Filter", "/img/search.png", new Color(0,153,255));
+        JButton btnReset = createButton("Reset", "/img/refresh.png", new Color(255, 153, 0));
 
         filterPanel.add(new JLabel("Dari:"));
         filterPanel.add(dariTanggal);
         filterPanel.add(new JLabel("Sampai:"));
         filterPanel.add(sampaiTanggal);
         filterPanel.add(btnFilter);
+        filterPanel.add(btnReset);
 
         contentBox.add(filterPanel, BorderLayout.NORTH);
 
         // ================= TABEL =================
         model = new DefaultTableModel(
-                new String[]{"ID Transaksi","Tanggal","Kasir","Nama Produk","Jumlah","Harga","Foto"},0
+                new String[]{"Kode Transaksi","Tanggal","Waktu","Kasir","Nama Produk","Kategori","Jumlah","Harga","Subtotal","Foto"},0
         ) {
             public boolean isCellEditable(int row,int column){ return false; }
             public Class<?> getColumnClass(int columnIndex) {
-                return columnIndex == 6 ? ImageIcon.class : Object.class;
+                return columnIndex == 9 ? ImageIcon.class : Object.class;
             }
         };
         table = new JTable(model);
@@ -93,11 +95,19 @@ public class RiwayatTransaksi extends JFrame {
         // Center alignment for some columns
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        // Right alignment untuk kolom numeric
+        DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
+        rightRenderer.setHorizontalAlignment(SwingConstants.RIGHT);
+
         table.getColumnModel().getColumn(0).setCellRenderer(centerRenderer);
         table.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
         table.getColumnModel().getColumn(2).setCellRenderer(centerRenderer);
-        table.getColumnModel().getColumn(4).setCellRenderer(centerRenderer);
+        table.getColumnModel().getColumn(3).setCellRenderer(centerRenderer);
         table.getColumnModel().getColumn(5).setCellRenderer(centerRenderer);
+        table.getColumnModel().getColumn(6).setCellRenderer(rightRenderer);
+        table.getColumnModel().getColumn(7).setCellRenderer(rightRenderer);
+        table.getColumnModel().getColumn(8).setCellRenderer(rightRenderer);
 
         JScrollPane sp = new JScrollPane(table);
         contentBox.add(sp, BorderLayout.CENTER);
@@ -106,6 +116,8 @@ public class RiwayatTransaksi extends JFrame {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER,10,10));
         btnPanel.setBackground(new Color(255,255,255,0));
         JButton btnBack = createButton("Kembali", "/img/back.png", new Color(153,153,153));
+        JButton btnDetail = createButton("Detail", "/img/detail.png", new Color(128, 0, 128));
+        btnPanel.add(btnDetail);
         btnPanel.add(btnBack);
         background.add(btnPanel, BorderLayout.SOUTH);
 
@@ -113,6 +125,8 @@ public class RiwayatTransaksi extends JFrame {
             dispose();
             SwingUtilities.invokeLater(() -> new DashboardKasir(kasir).setVisible(true));
         });
+
+        btnDetail.addActionListener(e -> showDetailTransaksi());
 
         // ================= LOAD DATA =================
         loadData(null,null);
@@ -122,6 +136,12 @@ public class RiwayatTransaksi extends JFrame {
             String dari = sdf.format(dariTanggal.getValue());
             String sampai = sdf.format(sampaiTanggal.getValue());
             loadData(dari,sampai);
+        });
+
+        btnReset.addActionListener(e -> {
+            dariTanggal.setValue(new Date());
+            sampaiTanggal.setValue(new Date());
+            loadData(null, null);
         });
     }
 
@@ -150,38 +170,62 @@ public class RiwayatTransaksi extends JFrame {
         model.setRowCount(0);
         try (Connection conn = Database.getConnection()) {
 
-            // ✅ QUERY FIX DENGAN FOTO PRODUK
-            String sql = "SELECT t.id AS idTransaksi, t.tanggal, u.username, p.nama_produk, d.qty, d.harga, p.foto " +
+            String sql = "SELECT " +
+                         "t.kode_transaksi, t.tanggal, t.waktu, " +
+                         "u.nama AS nama_kasir, u.username, " +
+                         "p.nama_produk, p.foto, " +
+                         "k.nama_kategori, " +
+                         "d.qty, d.harga, d.subtotal " +
                          "FROM transaksi t " +
                          "JOIN users u ON t.kasir_id = u.id " +
                          "JOIN detail_transaksi d ON t.id = d.transaksi_id " +
-                         "JOIN produk p ON d.produk_id = p.id ";
+                         "JOIN produk p ON d.produk_id = p.id " +
+                         "JOIN kategori k ON p.kategori_id = k.id " +
+                         "WHERE 1=1 ";
 
             if (dari != null && sampai != null) {
-                sql += "WHERE DATE(t.tanggal) BETWEEN ? AND ? ";
+                sql += "AND DATE(t.tanggal) BETWEEN ? AND ? ";
             }
 
-            sql += "ORDER BY t.id DESC";
+            // Jika kasir (bukan admin), hanya tampilkan transaksi kasir tersebut
+            if (!kasir.equals("admin")) {
+                sql += "AND u.username = ? ";
+            }
+
+            sql += "ORDER BY t.tanggal DESC, t.waktu DESC, t.id DESC";
 
             PreparedStatement pst = conn.prepareStatement(sql);
+            int paramIndex = 1;
+            
             if (dari != null && sampai != null) {
-                pst.setString(1, dari);
-                pst.setString(2, sampai);
+                pst.setString(paramIndex++, dari);
+                pst.setString(paramIndex++, sampai);
+            }
+            
+            if (!kasir.equals("admin")) {
+                pst.setString(paramIndex, kasir);
             }
 
             ResultSet rs = pst.executeQuery();
-            SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+            SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+            SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
 
             while (rs.next()) {
-                int idTransaksi = rs.getInt("idTransaksi");
-                String kode = String.format("TRX-%03d", idTransaksi);
-                Date tgl = rs.getTimestamp("tanggal");
-                String username = rs.getString("username");
+                String kodeTransaksi = rs.getString("kode_transaksi");
+                Date tanggal = rs.getDate("tanggal");
+                Time waktu = rs.getTime("waktu");
+                String namaKasir = rs.getString("nama_kasir");
+                String usernameKasir = rs.getString("username");
                 String produk = rs.getString("nama_produk");
+                String kategori = rs.getString("nama_kategori");
                 int qty = rs.getInt("qty");
                 double harga = rs.getDouble("harga");
+                double subtotal = rs.getDouble("subtotal");
 
-                // === Load foto produk ===
+                // Format info kasir
+                String infoKasir = namaKasir + " (" + usernameKasir + ")";
+
+                // Load foto produk
                 ImageIcon foto = null;
                 try {
                     String path = rs.getString("foto");
@@ -195,15 +239,25 @@ public class RiwayatTransaksi extends JFrame {
                 }
 
                 model.addRow(new Object[]{
-                        kode,
-                        sdf.format(tgl),
-                        username,
+                        kodeTransaksi,
+                        dateFormat.format(tanggal),
+                        timeFormat.format(waktu),
+                        infoKasir,
                         produk,
+                        kategori,
                         qty,
                         "Rp " + df.format(harga),
+                        "Rp " + df.format(subtotal),
                         foto
                 });
             }
+
+            // Update judul dengan info filter
+            String filterInfo = "Semua Data";
+            if (dari != null && sampai != null) {
+                filterInfo = "Periode: " + dari + " s/d " + sampai;
+            }
+            setTitle("📜 Riwayat Transaksi - " + kasir + " | " + filterInfo);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -211,8 +265,90 @@ public class RiwayatTransaksi extends JFrame {
         }
     }
 
+    private void showDetailTransaksi() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Pilih transaksi terlebih dahulu!");
+            return;
+        }
+
+        String kodeTransaksi = (String) table.getValueAt(selectedRow, 0);
+        String tanggal = (String) table.getValueAt(selectedRow, 1);
+        String waktu = (String) table.getValueAt(selectedRow, 2);
+
+        try (Connection conn = Database.getConnection()) {
+            String sql = "SELECT " +
+                        "t.kode_transaksi, t.total, t.status, " +
+                        "u.nama AS nama_kasir, u.username, u.shift, " +
+                        "p.nama_produk, k.nama_kategori, " +
+                        "d.qty, d.harga, d.subtotal " +
+                        "FROM transaksi t " +
+                        "JOIN users u ON t.kasir_id = u.id " +
+                        "JOIN detail_transaksi d ON t.id = d.transaksi_id " +
+                        "JOIN produk p ON d.produk_id = p.id " +
+                        "JOIN kategori k ON p.kategori_id = k.id " +
+                        "WHERE t.kode_transaksi = ? " +
+                        "ORDER BY p.nama_produk";
+
+            PreparedStatement pst = conn.prepareStatement(sql);
+            pst.setString(1, kodeTransaksi);
+            ResultSet rs = pst.executeQuery();
+
+            StringBuilder detail = new StringBuilder();
+            double totalTransaksi = 0;
+            boolean firstRow = true;
+
+            while (rs.next()) {
+                if (firstRow) {
+                    detail.append("=== DETAIL TRANSAKSI ===\n\n");
+                    detail.append("Kode Transaksi: ").append(rs.getString("kode_transaksi")).append("\n");
+                    detail.append("Tanggal       : ").append(tanggal).append(" ").append(waktu).append("\n");
+                    detail.append("Kasir         : ").append(rs.getString("nama_kasir")).append("\n");
+                    detail.append("Username      : ").append(rs.getString("username")).append("\n");
+                    detail.append("Shift         : ").append(rs.getString("shift")).append("\n");
+                    detail.append("Status        : ").append(rs.getString("status")).append("\n");
+                    detail.append("\n=== ITEM PEMBELIAN ===\n\n");
+                    firstRow = false;
+                }
+
+                String produk = rs.getString("nama_produk");
+                String kategori = rs.getString("nama_kategori");
+                int qty = rs.getInt("qty");
+                double harga = rs.getDouble("harga");
+                double subtotal = rs.getDouble("subtotal");
+                totalTransaksi += subtotal;
+
+                detail.append(String.format("Produk   : %s\n", produk));
+                detail.append(String.format("Kategori : %s\n", kategori));
+                detail.append(String.format("Qty      : %d\n", qty));
+                detail.append(String.format("Harga    : Rp %s\n", df.format(harga)));
+                detail.append(String.format("Subtotal : Rp %s\n", df.format(subtotal)));
+                detail.append("────────────────────────\n");
+            }
+
+            if (!firstRow) {
+                detail.append(String.format("\nTOTAL TRANSAKSI: Rp %s", df.format(totalTransaksi)));
+                
+                JTextArea textArea = new JTextArea(detail.toString());
+                textArea.setEditable(false);
+                textArea.setFont(new Font("Consolas", Font.PLAIN, 12));
+                
+                JScrollPane scrollPane = new JScrollPane(textArea);
+                scrollPane.setPreferredSize(new Dimension(500, 400));
+                
+                JOptionPane.showMessageDialog(this, scrollPane, 
+                    "Detail Transaksi - " + kodeTransaksi, 
+                    JOptionPane.INFORMATION_MESSAGE);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Gagal memuat detail transaksi!");
+        }
+    }
+
     public static void main(String[] args){
-        String kasirLogin = "messi";
+        String kasirLogin = "kasir1";
         SwingUtilities.invokeLater(() -> new RiwayatTransaksi(kasirLogin).setVisible(true));
     }
 }

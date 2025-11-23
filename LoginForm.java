@@ -142,76 +142,71 @@ public class LoginForm extends JFrame {
         // Masukin card ke background
         background.add(card);
     }
-private void login() {
-    String username = txtUser.getText().trim();
-    String password = new String(txtPass.getPassword()).trim();
-    String roleDipilih = (String) cmbRole.getSelectedItem();
 
-    if (username.isEmpty() || password.isEmpty()) {
-        JOptionPane.showMessageDialog(this,
-                "Username dan Password tidak boleh kosong!",
-                "Login Gagal",
-                JOptionPane.WARNING_MESSAGE);
-        return;
-    }
+    private void login() {
+        String username = txtUser.getText().trim();
+        String password = new String(txtPass.getPassword()).trim();
+        String roleDipilih = (String) cmbRole.getSelectedItem();
 
-    try (Connection conn = Database.getConnection()) {
-        String sql = "SELECT * FROM users WHERE username=? AND password=?";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, username);
-        ps.setString(2, password);
-        ResultSet rs = ps.executeQuery();
-
-        if (rs.next()) {
-            String roleDb = rs.getString("role");
-            int userId = rs.getInt("id");
-            String shift = rs.getString("shift");
-
-            // Cek apakah role di database sama dengan yang dipilih
-            if (!roleDb.equalsIgnoreCase(roleDipilih)) {
-                JOptionPane.showMessageDialog(this,
-                        "Role tidak sesuai dengan akun!\nAkun ini terdaftar sebagai: " + roleDb);
-                return;
-            }
-
-            // === Logika shift baru ===
-            if (roleDb.equalsIgnoreCase("admin")) {
-                // Admin hanya bisa login jika shift-nya "Shift 3"
-                if (!"Shift 3".equalsIgnoreCase(shift)) {
-                    JOptionPane.showMessageDialog(this,
-                            "Admin hanya bisa login jika shift-nya adalah Shift 3.\nSilakan ubah shift ke Shift 3 di data user.");
-                    return;
-                }
-            } else if (roleDb.equalsIgnoreCase("kasir")) {
-                // Kasir tetap dicek shift-nya sesuai jadwal
-                if (!cekShift(userId)) {
-                    JOptionPane.showMessageDialog(this,
-                            "Kamu tidak memiliki jadwal shift hari ini.\nCoba login sesuai jadwal shift kamu.");
-                    return;
-                }
-            }
-
-            JOptionPane.showMessageDialog(this, "Login berhasil sebagai " + roleDb);
-            txtUser.setText("");
-            txtPass.setText("");
-
-            if (roleDb.equalsIgnoreCase("admin")) {
-                new DashboardAdmin(username).setVisible(true);
-            } else {
-                new DashboardKasir(username).setVisible(true);
-            }
-
-            this.dispose();
-        } else {
-            JOptionPane.showMessageDialog(this, "Username atau password salah!");
+        if (username.isEmpty() || password.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "Username dan Password tidak boleh kosong!",
+                    "Login Gagal",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
         }
-    } catch (SQLException e) {
-        e.printStackTrace();
-        JOptionPane.showMessageDialog(this, "Error koneksi database!");
+
+        try (Connection conn = Database.getConnection()) {
+            String sql = "SELECT * FROM users WHERE username=? AND password=?";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, username);
+            ps.setString(2, password);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                String roleDb = rs.getString("role");
+                int userId = rs.getInt("id");
+                String shift = rs.getString("shift");
+
+                // Cek apakah role di database sama dengan yang dipilih
+                if (!roleDb.equalsIgnoreCase(roleDipilih)) {
+                    JOptionPane.showMessageDialog(this,
+                            "Role tidak sesuai dengan akun!\nAkun ini terdaftar sebagai: " + roleDb);
+                    return;
+                }
+
+                // === MODIFIKASI: Admin bebas login tanpa pengecekan shift ===
+                if (roleDb.equalsIgnoreCase("admin")) {
+                    // Admin bisa login kapan saja tanpa pengecekan shift
+                    // Tidak ada pengecekan shift untuk admin
+                } else if (roleDb.equalsIgnoreCase("kasir")) {
+                    // Kasir tetap dicek shift-nya sesuai jadwal
+                    if (!cekShift(userId)) {
+                        JOptionPane.showMessageDialog(this,
+                                "Kamu tidak memiliki jadwal shift hari ini.\nCoba login sesuai jadwal shift kamu.");
+                        return;
+                    }
+                }
+
+                JOptionPane.showMessageDialog(this, "Login berhasil sebagai " + roleDb);
+                txtUser.setText("");
+                txtPass.setText("");
+
+                if (roleDb.equalsIgnoreCase("admin")) {
+                    new DashboardAdmin(username).setVisible(true);
+                } else {
+                    new DashboardKasir(username).setVisible(true);
+                }
+
+                this.dispose();
+            } else {
+                JOptionPane.showMessageDialog(this, "Username atau password salah!");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error koneksi database!");
+        }
     }
-}
-
-
 
     private boolean cekShift(int userId) {
         int hari = LocalDate.now().getDayOfMonth(); 

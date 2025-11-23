@@ -209,13 +209,16 @@ public class TransaksiPenjualan extends JFrame {
     private void loadProduk(String keyword){
         modelProduk.setRowCount(0);
         try(Connection conn = Database.getConnection()){
-            String sql = "SELECT * FROM produk WHERE nama_produk LIKE ?";
+            String sql = "SELECT p.*, k.nama_kategori FROM produk p " +
+                        "JOIN kategori k ON p.kategori_id = k.id " +
+                        "WHERE p.nama_produk LIKE ? OR p.kode LIKE ? " +
+                        "ORDER BY p.nama_produk";
             PreparedStatement pst = conn.prepareStatement(sql);
             pst.setString(1, "%"+keyword+"%");
+            pst.setString(2, "%"+keyword+"%");
             ResultSet rs = pst.executeQuery();
             while(rs.next()){
-                int id = rs.getInt("id");
-                String kodeProduk = generateKodeProduk(id);
+                String kodeProduk = rs.getString("kode");
                 double harga = rs.getDouble("harga");
                 ImageIcon icon = null;
                 try {
@@ -232,7 +235,7 @@ public class TransaksiPenjualan extends JFrame {
                 modelProduk.addRow(new Object[]{
                         kodeProduk,
                         rs.getString("nama_produk"),
-                        rs.getString("kategori"),
+                        rs.getString("nama_kategori"),
                         "Rp " + df.format(harga),
                         rs.getInt("stok"),
                         icon
@@ -244,27 +247,12 @@ public class TransaksiPenjualan extends JFrame {
         }
     }
 
-    private String generateKodeProduk(int id){
-        return String.format("PRO-%04d", id);
-    }
-
-    private int getIdFromKode(String kode){
-        try(Connection conn = Database.getConnection()){
-            Statement st = conn.createStatement();
-            ResultSet rs = st.executeQuery("SELECT id FROM produk");
-            while(rs.next()){
-                int id = rs.getInt("id");
-                if(generateKodeProduk(id).equals(kode)) return id;
-            }
-        }catch(Exception e){
-            e.printStackTrace();
-        }
-        return -1;
-    }
-
     private void tambahKeranjang(){
         int row = tableProduk.getSelectedRow();
-        if(row==-1){ JOptionPane.showMessageDialog(this,"Pilih produk dulu!"); return; }
+        if(row==-1){ 
+            JOptionPane.showMessageDialog(this,"Pilih produk dulu!"); 
+            return; 
+        }
 
         String kode = (String) modelProduk.getValueAt(row,0);
         String nama = (String) modelProduk.getValueAt(row,1);
@@ -273,14 +261,49 @@ public class TransaksiPenjualan extends JFrame {
         int stok = (int) modelProduk.getValueAt(row,4);
         ImageIcon foto = (ImageIcon) modelProduk.getValueAt(row,5);
 
-        String jumlahStr = JOptionPane.showInputDialog(this,"Masukkan jumlah:");
+        String jumlahStr = JOptionPane.showInputDialog(this,"Masukkan jumlah untuk " + nama + ":");
         if(jumlahStr==null) return;
-        int jumlah = Integer.parseInt(jumlahStr);
-        if(jumlah>stok){ JOptionPane.showMessageDialog(this,"Stok tidak cukup!"); return; }
+        
+        try {
+            int jumlah = Integer.parseInt(jumlahStr);
+            if(jumlah <= 0){
+                JOptionPane.showMessageDialog(this,"Jumlah harus lebih dari 0!");
+                return;
+            }
+            if(jumlah>stok){ 
+                JOptionPane.showMessageDialog(this,"Stok tidak cukup! Stok tersedia: " + stok); 
+                return; 
+            }
 
-        double subtotal = harga*jumlah;
-        modelKeranjang.addRow(new Object[]{kode,nama,"Rp "+df.format(harga),jumlah,"Rp "+df.format(subtotal),foto});
-        hitungTotal();
+            // Cek apakah produk sudah ada di keranjang
+            for(int i=0; i<modelKeranjang.getRowCount(); i++){
+                String existingKode = (String) modelKeranjang.getValueAt(i,0);
+                if(existingKode.equals(kode)){
+                    int existingJumlah = (int) modelKeranjang.getValueAt(i,3);
+                    int newJumlah = existingJumlah + jumlah;
+                    if(newJumlah > stok){
+                        JOptionPane.showMessageDialog(this,"Total jumlah melebihi stok! Stok tersedia: " + stok);
+                        return;
+                    }
+                    // Update jumlah dan subtotal
+                    modelKeranjang.setValueAt(newJumlah, i, 3);
+                    double newSubtotal = newJumlah * harga;
+                    modelKeranjang.setValueAt("Rp " + df.format(newSubtotal), i, 4);
+                    hitungTotal();
+                    return;
+                }
+            }
+
+            // Jika produk belum ada di keranjang, tambahkan baru
+            double subtotal = harga * jumlah;
+            modelKeranjang.addRow(new Object[]{
+                kode, nama, "Rp "+df.format(harga), jumlah, "Rp "+df.format(subtotal), foto
+            });
+            hitungTotal();
+            
+        } catch(NumberFormatException e){
+            JOptionPane.showMessageDialog(this,"Masukkan jumlah yang valid!");
+        }
     }
 
     private void hitungTotal(){
@@ -293,8 +316,18 @@ public class TransaksiPenjualan extends JFrame {
     }
 
     private void bayar() {
+        if(modelKeranjang.getRowCount() == 0){
+            JOptionPane.showMessageDialog(this, "Keranjang kosong!", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
         try {
             double total = Double.parseDouble(txtTotal.getText().replace("Rp","").replace(".","").trim());
+            if(txtBayar.getText().trim().isEmpty()){
+                JOptionPane.showMessageDialog(this, "Masukkan jumlah pembayaran!", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
             double bayar = Double.parseDouble(txtBayar.getText().replace("Rp","").replace(".","").trim());
             if (bayar < total) {
                 JOptionPane.showMessageDialog(this, "Uang tidak cukup!", "Error", JOptionPane.ERROR_MESSAGE);
@@ -303,35 +336,60 @@ public class TransaksiPenjualan extends JFrame {
 
             double kembalian = bayar - total;
 
-            try (Connection conn = Database.getConnection()) {
+            // Pindahkan koneksi ke luar try-with-resources agar bisa diakses di catch
+            Connection conn = null;
+            try {
+                conn = Database.getConnection();
                 conn.setAutoCommit(false);
 
+                // Dapatkan ID kasir
                 int idKasir = 0;
                 String sqlKasir = "SELECT id FROM users WHERE username = ?";
                 PreparedStatement pstKasir = conn.prepareStatement(sqlKasir);
                 pstKasir.setString(1, kasirUsername);
                 ResultSet rsKasir = pstKasir.executeQuery();
-                if (rsKasir.next()) idKasir = rsKasir.getInt("id");
+                if (rsKasir.next()) {
+                    idKasir = rsKasir.getInt("id");
+                }
 
-                String sqlTrans = "INSERT INTO transaksi (kasir_id, tanggal, total, status) VALUES (?, NOW(), ?, ?)";
+                // Generate kode transaksi
+                String kodeTransaksi = generateKodeTransaksi(conn);
+
+                // Insert ke tabel transaksi
+                String sqlTrans = "INSERT INTO transaksi (kode_transaksi, total, tanggal, kasir_id, status, waktu) " +
+                                 "VALUES (?, ?, CURDATE(), ?, 'selesai', CURTIME())";
                 PreparedStatement pstTrans = conn.prepareStatement(sqlTrans, Statement.RETURN_GENERATED_KEYS);
-                pstTrans.setInt(1, idKasir);
+                pstTrans.setString(1, kodeTransaksi);
                 pstTrans.setDouble(2, total);
-                pstTrans.setString(3, "selesai");
+                pstTrans.setInt(3, idKasir);
                 pstTrans.executeUpdate();
 
                 ResultSet gk = pstTrans.getGeneratedKeys();
                 int idTransaksi = 0;
-                if (gk.next()) idTransaksi = gk.getInt(1);
+                if (gk.next()) {
+                    idTransaksi = gk.getInt(1);
+                }
 
+                // Insert detail transaksi dan update stok
                 for (int i = 0; i < modelKeranjang.getRowCount(); i++) {
                     String kodeProduk = (String) modelKeranjang.getValueAt(i, 0);
-                    int idProduk = getIdFromKode(kodeProduk);
                     int qty = (int) modelKeranjang.getValueAt(i, 3);
                     String hargaStr = modelKeranjang.getValueAt(i, 2).toString().replace("Rp","").replace(".","").trim();
                     double harga = Double.parseDouble(hargaStr);
 
-                    String sqlDet = "INSERT INTO detail_transaksi (transaksi_id, produk_id, qty, harga) VALUES (?,?,?,?)";
+                    // Dapatkan ID produk dari kode
+                    int idProduk = 0;
+                    String sqlProduk = "SELECT id FROM produk WHERE kode = ?";
+                    PreparedStatement pstProduk = conn.prepareStatement(sqlProduk);
+                    pstProduk.setString(1, kodeProduk);
+                    ResultSet rsProduk = pstProduk.executeQuery();
+                    if (rsProduk.next()) {
+                        idProduk = rsProduk.getInt("id");
+                    }
+
+                    // Insert detail transaksi TANPA kolom subtotal (karena generated column)
+                    String sqlDet = "INSERT INTO detail_transaksi (transaksi_id, produk_id, qty, harga) " +
+                                   "VALUES (?, ?, ?, ?)";
                     PreparedStatement pstDet = conn.prepareStatement(sqlDet);
                     pstDet.setInt(1, idTransaksi);
                     pstDet.setInt(2, idProduk);
@@ -339,6 +397,7 @@ public class TransaksiPenjualan extends JFrame {
                     pstDet.setDouble(4, harga);
                     pstDet.executeUpdate();
 
+                    // Update stok produk
                     String sqlUpdateStok = "UPDATE produk SET stok = stok - ? WHERE id = ?";
                     PreparedStatement pstStok = conn.prepareStatement(sqlUpdateStok);
                     pstStok.setInt(1, qty);
@@ -349,134 +408,168 @@ public class TransaksiPenjualan extends JFrame {
                 conn.commit();
 
                 JOptionPane.showMessageDialog(this,
-                        "Transaksi berhasil!\nID Transaksi: TRX-" + String.format("%03d", idTransaksi) +
+                        "Transaksi berhasil!\nKode Transaksi: " + kodeTransaksi +
                                 "\nTotal: Rp " + df.format(total) +
                                 "\nBayar: Rp " + df.format(bayar) +
                                 "\nKembalian: Rp " + df.format(kembalian),
                         "Sukses", JOptionPane.INFORMATION_MESSAGE);
 
-                cetakStruk(idTransaksi, total, bayar, kembalian);
+                cetakStruk(idTransaksi, kodeTransaksi, total, bayar, kembalian);
 
+                // Reset form
                 modelKeranjang.setRowCount(0);
                 txtTotal.setText("Rp 0");
                 txtBayar.setText("");
+                loadProduk(""); // Refresh stok produk
 
             } catch (Exception ex) {
+                // Rollback jika terjadi error
+                if (conn != null) {
+                    try {
+                        conn.rollback();
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                }
                 ex.printStackTrace();
                 JOptionPane.showMessageDialog(this, "Gagal melakukan transaksi: " + ex.getMessage(),
                         "Error", JOptionPane.ERROR_MESSAGE);
+            } finally {
+                // Tutup koneksi di finally block
+                if (conn != null) {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
 
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this, "Masukkan nominal yang valid!", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-public void cetakStruk(int idTransaksi, double total, double bayar, double kembalian) {
-    try {
-        JFrame frame = new JFrame("🧾 Struk Pembayaran");
-        frame.setSize(380, 560);
-        frame.setLocationRelativeTo(null);
-        frame.setResizable(false);
-        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        JPanel panelUtama = new JPanel(new BorderLayout());
-        panelUtama.setBackground(Color.WHITE);
-
-        // HEADER
-        JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 8));
-        headerPanel.setBackground(new Color(0, 102, 204));
-        headerPanel.setPreferredSize(new Dimension(380, 60));
-
-        JLabel lblLogo = new JLabel();
-        try {
-            ImageIcon logoIcon = new ImageIcon(getClass().getResource("/img/logo.jpg"));
-            Image img = logoIcon.getImage().getScaledInstance(35, 35, Image.SCALE_SMOOTH);
-            lblLogo.setIcon(new ImageIcon(img));
-        } catch (Exception e) {
-            lblLogo.setText("");
+    private String generateKodeTransaksi(Connection conn) throws SQLException {
+        String sql = "SELECT COUNT(*) as count FROM transaksi WHERE tanggal = CURDATE()";
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(sql);
+        int count = 0;
+        if (rs.next()) {
+            count = rs.getInt("count") + 1;
         }
-
-        JLabel lblNamaToko = new JLabel("TOKO KOMPUTER BYNEST");
-        lblNamaToko.setFont(new Font("Segoe UI Semibold", Font.BOLD, 16));
-        lblNamaToko.setForeground(Color.WHITE);
-
-        headerPanel.add(lblLogo);
-        headerPanel.add(lblNamaToko);
-        panelUtama.add(headerPanel, BorderLayout.NORTH);
-
-        // AREA STRUK
-        JTextArea area = new JTextArea();
-        area.setEditable(false);
-        area.setFont(new Font("Consolas", Font.PLAIN, 13));
-        area.setForeground(Color.DARK_GRAY);
-        area.setBackground(Color.WHITE);
-        area.setBorder(BorderFactory.createEmptyBorder(15, 25, 15, 25));
-        area.setFocusable(false);
-
-        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-        String tanggal = sdf.format(new java.util.Date());
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("              TOKO KOMPUTER BYNEST\n");
-        sb.append("     Jl. Merdeka No.99, Bandung - 40123\n");
-        sb.append("             Telp. 0812-3456-7890\n");
-        sb.append("========================================\n");
-        sb.append(String.format("ID Transaksi : TRX-%03d\n", idTransaksi));
-        sb.append("Tanggal      : ").append(tanggal).append("\n");
-        sb.append("Kasir        : ").append(kasirUsername).append("\n");
-        sb.append("----------------------------------------\n");
-        sb.append("Nama Barang         Qty   Harga     Total\n");
-        sb.append("----------------------------------------\n");
-
-        for (int i = 0; i < modelKeranjang.getRowCount(); i++) {
-            String nama = modelKeranjang.getValueAt(i, 1).toString();
-            int qty = Integer.parseInt(modelKeranjang.getValueAt(i, 3).toString());
-            String hargaStr = modelKeranjang.getValueAt(i, 2).toString();
-            String subStr = modelKeranjang.getValueAt(i, 4).toString();
-
-            sb.append(String.format("%-15s %3d %10s %10s\n",
-                    nama.length() > 15 ? nama.substring(0, 15) : nama,
-                    qty, hargaStr, subStr));
-        }
-
-        sb.append("----------------------------------------\n");
-        sb.append(String.format("TOTAL       : Rp %s\n", df.format(total)));
-        sb.append(String.format("BAYAR       : Rp %s\n", df.format(bayar)));
-        sb.append(String.format("KEMBALIAN   : Rp %s\n", df.format(kembalian)));
-        sb.append("========================================\n");
-        sb.append("  TERIMA KASIH TELAH BERBELANJA DI BYNEST\n");
-        sb.append("========================================\n");
-
-        area.setText(sb.toString());
-
-        JScrollPane scrollPane = new JScrollPane(area);
-        scrollPane.setBorder(null);
-        panelUtama.add(scrollPane, BorderLayout.CENTER);
-
-        // ✅ TOMBOL OK
-        JButton btnOk = new JButton("OK");
-        btnOk.setBackground(new Color(0, 102, 204));
-        btnOk.setForeground(Color.WHITE);
-        btnOk.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        btnOk.setFocusPainted(false);
-        btnOk.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btnOk.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
-
-        JPanel footerPanel = new JPanel();
-        footerPanel.setBackground(Color.WHITE);
-        footerPanel.add(btnOk);
-        panelUtama.add(footerPanel, BorderLayout.SOUTH);
-
-        // Aksi tombol
-        btnOk.addActionListener(e -> frame.dispose());
-
-        frame.add(panelUtama);
-        frame.setVisible(true);
-
-    } catch (Exception e) {
-        JOptionPane.showMessageDialog(null, "Gagal mencetak struk: " + e.getMessage());
+        
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyMMdd");
+        String datePart = sdf.format(new java.util.Date());
+        return "TRX-" + datePart + "-" + String.format("%03d", count);
     }
-}
+
+    public void cetakStruk(int idTransaksi, String kodeTransaksi, double total, double bayar, double kembalian) {
+        try {
+            JFrame frame = new JFrame("🧾 Struk Pembayaran");
+            frame.setSize(380, 560);
+            frame.setLocationRelativeTo(null);
+            frame.setResizable(false);
+            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+
+            JPanel panelUtama = new JPanel(new BorderLayout());
+            panelUtama.setBackground(Color.WHITE);
+
+            // HEADER
+            JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 8));
+            headerPanel.setBackground(new Color(0, 102, 204));
+            headerPanel.setPreferredSize(new Dimension(380, 60));
+
+            JLabel lblLogo = new JLabel();
+            try {
+                ImageIcon logoIcon = new ImageIcon(getClass().getResource("/img/logo.jpg"));
+                Image img = logoIcon.getImage().getScaledInstance(35, 35, Image.SCALE_SMOOTH);
+                lblLogo.setIcon(new ImageIcon(img));
+            } catch (Exception e) {
+                lblLogo.setText("");
+            }
+
+            JLabel lblNamaToko = new JLabel("TOKO KOMPUTER BYNEST");
+            lblNamaToko.setFont(new Font("Segoe UI Semibold", Font.BOLD, 16));
+            lblNamaToko.setForeground(Color.WHITE);
+
+            headerPanel.add(lblLogo);
+            headerPanel.add(lblNamaToko);
+            panelUtama.add(headerPanel, BorderLayout.NORTH);
+
+            // AREA STRUK
+            JTextArea area = new JTextArea();
+            area.setEditable(false);
+            area.setFont(new Font("Consolas", Font.PLAIN, 13));
+            area.setForeground(Color.DARK_GRAY);
+            area.setBackground(Color.WHITE);
+            area.setBorder(BorderFactory.createEmptyBorder(15, 25, 15, 25));
+            area.setFocusable(false);
+
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+            String tanggal = sdf.format(new java.util.Date());
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("              TOKO KOMPUTER BYNEST\n");
+            sb.append("     Jl. Merdeka No.99, Bandung - 40123\n");
+            sb.append("             Telp. 0812-3456-7890\n");
+            sb.append("========================================\n");
+            sb.append(String.format("Kode Transaksi : %s\n", kodeTransaksi));
+            sb.append("Tanggal      : ").append(tanggal).append("\n");
+            sb.append("Kasir        : ").append(kasirUsername).append("\n");
+            sb.append("----------------------------------------\n");
+            sb.append("Nama Barang         Qty   Harga     Total\n");
+            sb.append("----------------------------------------\n");
+
+            for (int i = 0; i < modelKeranjang.getRowCount(); i++) {
+                String nama = modelKeranjang.getValueAt(i, 1).toString();
+                int qty = Integer.parseInt(modelKeranjang.getValueAt(i, 3).toString());
+                String hargaStr = modelKeranjang.getValueAt(i, 2).toString();
+                String subStr = modelKeranjang.getValueAt(i, 4).toString();
+
+                sb.append(String.format("%-15s %3d %10s %10s\n",
+                        nama.length() > 15 ? nama.substring(0, 15) : nama,
+                        qty, hargaStr, subStr));
+            }
+
+            sb.append("----------------------------------------\n");
+            sb.append(String.format("TOTAL       : Rp %s\n", df.format(total)));
+            sb.append(String.format("BAYAR       : Rp %s\n", df.format(bayar)));
+            sb.append(String.format("KEMBALIAN   : Rp %s\n", df.format(kembalian)));
+            sb.append("========================================\n");
+            sb.append("  TERIMA KASIH TELAH BERBELANJA DI BYNEST\n");
+            sb.append("========================================\n");
+
+            area.setText(sb.toString());
+
+            JScrollPane scrollPane = new JScrollPane(area);
+            scrollPane.setBorder(null);
+            panelUtama.add(scrollPane, BorderLayout.CENTER);
+
+            // TOMBOL OK
+            JButton btnOk = new JButton("OK");
+            btnOk.setBackground(new Color(0, 102, 204));
+            btnOk.setForeground(Color.WHITE);
+            btnOk.setFont(new Font("Segoe UI", Font.BOLD, 14));
+            btnOk.setFocusPainted(false);
+            btnOk.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            btnOk.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+
+            JPanel footerPanel = new JPanel();
+            footerPanel.setBackground(Color.WHITE);
+            footerPanel.add(btnOk);
+            panelUtama.add(footerPanel, BorderLayout.SOUTH);
+
+            // Aksi tombol
+            btnOk.addActionListener(e -> frame.dispose());
+
+            frame.add(panelUtama);
+            frame.setVisible(true);
+
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Gagal mencetak struk: " + e.getMessage());
+        }
+    }
 
     public static void main(String[] args) {
         new TransaksiPenjualan("admin").setVisible(true);

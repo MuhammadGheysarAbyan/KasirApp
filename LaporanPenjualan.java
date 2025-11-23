@@ -177,10 +177,17 @@ public class LaporanPenjualan extends JFrame {
         // ================= BUTTON PANEL =================
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
         btnPanel.setOpaque(false);
+        
+        // TOMBOL DETAIL TRANSAKSI - WARNA UNGU (dipindah ke kiri)
+        JButton btnDetail = createButton("Detail Transaksi", "/img/detail.png", new Color(128, 0, 128)); // Warna ungu
+        
+        // TOMBOL KEMBALI (dipindah ke kanan)
         JButton btnBack = createButton("Kembali", "/img/back.png", new Color(153, 153, 153));
-        JButton btnDetail = createButton("Detail Transaksi", "/img/detail.png", new Color(108, 117, 125));
-        btnPanel.add(btnBack);
+        
+        // Urutan tombol ditukar: Detail dulu, kemudian Kembali
         btnPanel.add(btnDetail);
+        btnPanel.add(btnBack);
+        
         mainPanel.add(btnPanel, BorderLayout.SOUTH);
 
         // ================= EVENT HANDLERS =================
@@ -592,8 +599,10 @@ public class LaporanPenjualan extends JFrame {
         String usernameKasir = kasirInfo.substring(kasirInfo.lastIndexOf("(") + 1, kasirInfo.lastIndexOf(")"));
 
         try (Connection conn = Database.getConnection()) {
-            String sql = "SELECT t.id, t.total, t.status, u.nama AS nama_kasir, " +
-                        "u.shift, p.nama_produk, k.nama_kategori, d.qty, d.harga " +
+            String sql = "SELECT t.id, t.kode_transaksi, t.total, t.status, " +
+                        "u.nama AS nama_kasir, u.shift, " +
+                        "p.nama_produk, k.nama_kategori, " +
+                        "d.qty, d.harga, d.subtotal " +
                         "FROM transaksi t " +
                         "JOIN users u ON t.kasir_id = u.id " +
                         "JOIN detail_transaksi d ON t.id = d.transaksi_id " +
@@ -612,6 +621,7 @@ public class LaporanPenjualan extends JFrame {
                 String detail = String.format(
                     "Detail Transaksi:\n\n" +
                     "ID Transaksi: %d\n" +
+                    "Kode Transaksi: %s\n" +
                     "Total: Rp %s\n" +
                     "Status: %s\n" +
                     "Kasir: %s\n" +
@@ -619,8 +629,10 @@ public class LaporanPenjualan extends JFrame {
                     "Produk: %s\n" +
                     "Kategori: %s\n" +
                     "Qty: %d\n" +
-                    "Harga: Rp %s",
+                    "Harga Satuan: Rp %s\n" +
+                    "Subtotal: Rp %s",
                     rs.getInt("id"),
+                    rs.getString("kode_transaksi"),
                     df.format(rs.getDouble("total")),
                     rs.getString("status"),
                     rs.getString("nama_kasir"),
@@ -628,7 +640,8 @@ public class LaporanPenjualan extends JFrame {
                     rs.getString("nama_produk"),
                     rs.getString("nama_kategori"),
                     rs.getInt("qty"),
-                    df.format(rs.getDouble("harga"))
+                    df.format(rs.getDouble("harga")),
+                    df.format(rs.getDouble("subtotal"))
                 );
 
                 JOptionPane.showMessageDialog(this, detail, "Detail Transaksi", JOptionPane.INFORMATION_MESSAGE);

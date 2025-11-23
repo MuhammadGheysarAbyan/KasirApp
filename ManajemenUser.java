@@ -120,7 +120,7 @@ public class ManajemenUser extends JFrame {
             int row = table.getSelectedRow();
             if (row != -1) {
                 try {
-                    selectedCode = (String) model.getValueAt(row, 0);
+                    selectedCode = getSafeString(model.getValueAt(row, 0));
                 } catch (Exception ex) {
                     selectedCode = null;
                 }
@@ -159,6 +159,9 @@ public class ManajemenUser extends JFrame {
             Statement st = conn.createStatement();
             ResultSet rs = st.executeQuery(sql);
             while (rs.next()) {
+                String shiftValue = rs.getString("shift");
+                String shiftDisplay = normalizeShiftDisplay(shiftValue);
+                
                 model.addRow(new Object[]{
                         rs.getString("user_code"),
                         rs.getString("nama"),
@@ -168,23 +171,64 @@ public class ManajemenUser extends JFrame {
                         rs.getString("email"),
                         rs.getString("no_telp"),
                         rs.getString("alamat"),
-                        rs.getString("shift")
+                        shiftDisplay
                 });
             }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Gagal load data!\n" + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    // ----------------- Helper Validasi -----------------
+    // ----------------- Helper Methods -----------------
+    private String getSafeString(Object value) {
+        return value == null ? "" : value.toString();
+    }
+
+    // Untuk display di tabel (bisa panjang)
+    private String normalizeShiftDisplay(String shift) {
+        if (shift == null) return "Pagi";
+        
+        shift = shift.trim().toLowerCase();
+        if (shift.contains("pagi") || shift.equals("s1") || shift.equals("1") || shift.equals("shift 1")) {
+            return "Pagi";
+        } else if (shift.contains("siang") || shift.equals("s2") || shift.equals("2") || shift.equals("shift 2")) {
+            return "Siang";
+        } else if (shift.contains("malam") || shift.equals("s3") || shift.equals("3") || shift.equals("shift 3")) {
+            return "Malam";
+        } else if (shift.contains("admin") || shift.equals("full") || shift.equals("24 jam") || shift.equals("24")) {
+            return "24 Jam";
+        } else {
+            return shift;
+        }
+    }
+
+    // Untuk simpan ke database (harus pendek)
+    private String normalizeShiftForDatabase(String shift) {
+        if (shift == null) return "Pagi";
+        
+        shift = shift.trim().toLowerCase();
+        if (shift.contains("pagi") || shift.equals("s1") || shift.equals("1") || shift.equals("shift 1")) {
+            return "Pagi";
+        } else if (shift.contains("siang") || shift.equals("s2") || shift.equals("2") || shift.equals("shift 2")) {
+            return "Siang";
+        } else if (shift.contains("malam") || shift.equals("s3") || shift.equals("3") || shift.equals("shift 3")) {
+            return "Malam";
+        } else if (shift.contains("admin") || shift.equals("full") || shift.equals("24 jam") || shift.equals("24") || shift.contains("24 jam")) {
+            return "Admin"; // Simpan sebagai "Admin" saja ke database
+        } else {
+            return shift;
+        }
+    }
+
     private boolean isValidEmail(String email) {
-        if (email == null) return false;
+        if (email == null || email.trim().isEmpty()) return false;
         String emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$";
         return email.matches(emailRegex);
     }
 
     private boolean isValidPhoneNumber(String phone) {
-        if (phone == null) return false;
+        if (phone == null || phone.trim().isEmpty()) return false;
         return phone.matches("\\d{10,15}");
     }
 
@@ -225,16 +269,30 @@ public class ManajemenUser extends JFrame {
         JComboBox<String> cbRole = new JComboBox<>(roles);
         JComboBox<String> cbShift = new JComboBox<>();
 
+        // Setup combo box shift berdasarkan role
         cbRole.addActionListener(e -> {
             String selectedRole = (String) cbRole.getSelectedItem();
             cbShift.removeAllItems();
+            
             if ("admin".equalsIgnoreCase(selectedRole)) {
-                cbShift.addItem("Shift 3");
+                // SHIFT KHUSUS ADMIN - 24 Jam
+                cbShift.addItem("24 Jam (Admin)");
             } else {
-                cbShift.addItem("Shift 1");
-                cbShift.addItem("Shift 2");
+                // SHIFT BIASA UNTUK KASIR
+                cbShift.addItem("Pagi");
+                cbShift.addItem("Siang");
+                cbShift.addItem("Malam");
+            }
+            
+            // Set default value
+            if ("admin".equalsIgnoreCase(selectedRole)) {
+                cbShift.setSelectedItem("24 Jam (Admin)");
+            } else {
+                cbShift.setSelectedItem("Pagi");
             }
         });
+
+        // Trigger initial setup
         cbRole.setSelectedIndex(0);
         cbRole.getActionListeners()[0].actionPerformed(null);
 
@@ -247,7 +305,8 @@ public class ManajemenUser extends JFrame {
                 "No. Telp:*", tfNoTelp,
                 "Alamat:*", tfAlamat,
                 "Shift:*", cbShift,
-                "", new JLabel("<html><font color='red'>* Wajib diisi</font></html>")
+                "", new JLabel("<html><font color='red'>* Wajib diisi</font></html>"),
+                "", new JLabel("<html><font color='blue'>Note: Admin memiliki shift 24 Jam</font></html>")
         };
 
         JOptionPane optionPane = new JOptionPane(message, JOptionPane.PLAIN_MESSAGE, JOptionPane.OK_CANCEL_OPTION);
@@ -272,7 +331,8 @@ public class ManajemenUser extends JFrame {
                 String noTelp = tfNoTelp.getText().trim();
                 String alamat = tfAlamat.getText().trim();
                 String role = (String) cbRole.getSelectedItem();
-                String shift = (String) cbShift.getSelectedItem();
+                String shiftDisplay = (String) cbShift.getSelectedItem();
+                String shiftForDB = normalizeShiftForDatabase(shiftDisplay);
 
                 if (isFieldEmpty(nama, username, password, email, noTelp, alamat)) {
                     JOptionPane.showMessageDialog(dialog, "Semua field wajib diisi!");
@@ -287,7 +347,7 @@ public class ManajemenUser extends JFrame {
                 }
 
                 if (!isValidPhoneNumber(noTelp)) {
-                    JOptionPane.showMessageDialog(dialog, "Nomor telepon tidak valid!");
+                    JOptionPane.showMessageDialog(dialog, "Nomor telepon harus 10-15 digit!");
                     optionPane.setValue(JOptionPane.UNINITIALIZED_VALUE);
                     continue;
                 }
@@ -314,7 +374,7 @@ public class ManajemenUser extends JFrame {
                     ps.setString(6, email);
                     ps.setString(7, noTelp);
                     ps.setString(8, alamat);
-                    ps.setString(9, shift);
+                    ps.setString(9, shiftForDB); // Simpan versi pendek ke database
 
                     int affected = ps.executeUpdate();
                     if (affected > 0) {
@@ -325,6 +385,7 @@ public class ManajemenUser extends JFrame {
                     }
                 } catch (SQLException e) {
                     JOptionPane.showMessageDialog(this, "Error DB: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
         }
@@ -338,15 +399,27 @@ public class ManajemenUser extends JFrame {
         }
 
         int row = table.getSelectedRow();
-        String kodeUserAwal = model.getValueAt(row, 0).toString();
-        String namaAwal = model.getValueAt(row, 1).toString();
-        String usernameAwal = model.getValueAt(row, 2).toString();
-        String passwordAwal = model.getValueAt(row, 3).toString();
-        String roleAwal = model.getValueAt(row, 4).toString();
-        String emailAwal = model.getValueAt(row, 5).toString();
-        String noTelpAwal = model.getValueAt(row, 6).toString();
-        String alamatAwal = model.getValueAt(row, 7).toString();
-        String shiftAwal = model.getValueAt(row, 8).toString();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Pilih user dulu!");
+            return;
+        }
+
+        // Ambil data dengan penanganan null
+        String kodeUserAwal = getSafeString(model.getValueAt(row, 0));
+        String namaAwal = getSafeString(model.getValueAt(row, 1));
+        String usernameAwal = getSafeString(model.getValueAt(row, 2));
+        String passwordAwal = getSafeString(model.getValueAt(row, 3));
+        String roleAwal = getSafeString(model.getValueAt(row, 4));
+        String emailAwal = getSafeString(model.getValueAt(row, 5));
+        String noTelpAwal = getSafeString(model.getValueAt(row, 6));
+        String alamatAwal = getSafeString(model.getValueAt(row, 7));
+        String shiftDisplayAwal = getSafeString(model.getValueAt(row, 8));
+
+        // Validasi data penting
+        if (kodeUserAwal.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Data user tidak valid!");
+            return;
+        }
 
         JTextField tfNama = new JTextField(namaAwal);
         JTextField tfUsername = new JTextField(usernameAwal);
@@ -355,16 +428,57 @@ public class ManajemenUser extends JFrame {
         JTextField tfNoTelp = new JTextField(noTelpAwal);
         JTextField tfAlamat = new JTextField(alamatAwal);
 
-        JComboBox<String> cbRole = new JComboBox<>(new String[]{roleAwal});
+        String[] roles = {"admin", "kasir"};
+        JComboBox<String> cbRole = new JComboBox<>(roles);
+        cbRole.setSelectedItem(roleAwal.isEmpty() ? "kasir" : roleAwal);
+        
         JComboBox<String> cbShift = new JComboBox<>();
 
-        if ("admin".equalsIgnoreCase(roleAwal)) {
-            cbShift.addItem("Shift 3");
-        } else {
-            cbShift.addItem("Shift 1");
-            cbShift.addItem("Shift 2");
-        }
-        cbShift.setSelectedItem(shiftAwal);
+        // Setup shift berdasarkan role
+        cbRole.addActionListener(e -> {
+            String selectedRole = (String) cbRole.getSelectedItem();
+            cbShift.removeAllItems();
+            
+            if ("admin".equalsIgnoreCase(selectedRole)) {
+                // SHIFT KHUSUS ADMIN - 24 Jam
+                cbShift.addItem("24 Jam (Admin)");
+            } else {
+                // SHIFT BIASA UNTUK KASIR
+                cbShift.addItem("Pagi");
+                cbShift.addItem("Siang");
+                cbShift.addItem("Malam");
+            }
+            
+            // Set shift yang sesuai dengan data awal
+            if ("admin".equalsIgnoreCase(selectedRole)) {
+                cbShift.setSelectedItem("24 Jam (Admin)");
+            } else {
+                // Jika sebelumnya admin dan diganti ke kasir, set default Pagi
+                if ("admin".equalsIgnoreCase(roleAwal) && "kasir".equalsIgnoreCase(selectedRole)) {
+                    cbShift.setSelectedItem("Pagi");
+                } else {
+                    // Pertahankan shift yang ada jika tersedia
+                    String normalizedShift = normalizeShiftDisplay(shiftDisplayAwal);
+                    if (cbShift.getItemCount() > 0) {
+                        boolean shiftExists = false;
+                        for (int i = 0; i < cbShift.getItemCount(); i++) {
+                            if (cbShift.getItemAt(i).equals(normalizedShift)) {
+                                shiftExists = true;
+                                break;
+                            }
+                        }
+                        if (shiftExists) {
+                            cbShift.setSelectedItem(normalizedShift);
+                        } else {
+                            cbShift.setSelectedIndex(0);
+                        }
+                    }
+                }
+            }
+        });
+
+        // Trigger initial setup
+        cbRole.getActionListeners()[0].actionPerformed(null);
 
         Object[] message = {
                 "Kode User:", new JLabel(kodeUserAwal),
@@ -375,51 +489,111 @@ public class ManajemenUser extends JFrame {
                 "Email:*", tfEmail,
                 "No. Telp:*", tfNoTelp,
                 "Alamat:*", tfAlamat,
-                "Shift:*", cbShift
+                "Shift:*", cbShift,
+                "", new JLabel("<html><font color='red'>* Wajib diisi</font></html>"),
+                "", new JLabel("<html><font color='blue'>Note: Admin memiliki shift 24 Jam</font></html>")
         };
 
-        int option = JOptionPane.showConfirmDialog(this, message, "Edit User", JOptionPane.OK_CANCEL_OPTION);
+        int option = JOptionPane.showConfirmDialog(this, message, "Edit User - " + kodeUserAwal, 
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
         if (option == JOptionPane.OK_OPTION) {
+            // Validasi input
+            if (isFieldEmpty(tfNama.getText().trim(), tfUsername.getText().trim(), 
+                            tfPassword.getText().trim(), tfEmail.getText().trim())) {
+                JOptionPane.showMessageDialog(this, "Field wajib tidak boleh kosong!");
+                return;
+            }
+
+            if (!isValidEmail(tfEmail.getText().trim())) {
+                JOptionPane.showMessageDialog(this, "Format email tidak valid!");
+                return;
+            }
+
+            if (!isValidPhoneNumber(tfNoTelp.getText().trim())) {
+                JOptionPane.showMessageDialog(this, "Nomor telepon harus 10-15 digit!");
+                return;
+            }
+
             try (Connection conn = Database.getConnection()) {
-                String sql = "UPDATE users SET nama=?, username=?, password=?, email=?, no_telp=?, alamat=?, shift=? WHERE user_code=?";
+                // Cek username duplikat (kecuali username sendiri)
+                String checkSql = "SELECT COUNT(*) FROM users WHERE username = ? AND user_code != ?";
+                PreparedStatement checkPs = conn.prepareStatement(checkSql);
+                checkPs.setString(1, tfUsername.getText().trim());
+                checkPs.setString(2, kodeUserAwal);
+                ResultSet rs = checkPs.executeQuery();
+                
+                if (rs.next() && rs.getInt(1) > 0) {
+                    JOptionPane.showMessageDialog(this, "Username sudah digunakan user lain!");
+                    return;
+                }
+
+                String shiftDisplay = (String) cbShift.getSelectedItem();
+                String shiftForDB = normalizeShiftForDatabase(shiftDisplay);
+
+                String sql = "UPDATE users SET nama=?, username=?, password=?, role=?, email=?, no_telp=?, alamat=?, shift=? WHERE user_code=?";
                 PreparedStatement ps = conn.prepareStatement(sql);
                 ps.setString(1, tfNama.getText().trim());
                 ps.setString(2, tfUsername.getText().trim());
                 ps.setString(3, tfPassword.getText().trim());
-                ps.setString(4, tfEmail.getText().trim());
-                ps.setString(5, tfNoTelp.getText().trim());
-                ps.setString(6, tfAlamat.getText().trim());
-                ps.setString(7, (String) cbShift.getSelectedItem());
-                ps.setString(8, kodeUserAwal);
+                ps.setString(4, (String) cbRole.getSelectedItem());
+                ps.setString(5, tfEmail.getText().trim());
+                ps.setString(6, tfNoTelp.getText().trim());
+                ps.setString(7, tfAlamat.getText().trim());
+                ps.setString(8, shiftForDB); // Simpan versi pendek ke database
+                ps.setString(9, kodeUserAwal);
 
                 int affected = ps.executeUpdate();
                 if (affected > 0) {
                     JOptionPane.showMessageDialog(this, "Data user berhasil diperbarui!");
                     loadData();
+                } else {
+                    JOptionPane.showMessageDialog(this, "Gagal update data user!");
                 }
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+                e.printStackTrace();
             }
         }
     }
 
+    // ----------------- hapusUser() -----------------
     private void hapusUser() {
         if (selectedCode == null) {
             JOptionPane.showMessageDialog(this, "Pilih user dulu!");
             return;
         }
-        int confirm = JOptionPane.showConfirmDialog(this, "Hapus user " + selectedCode + "?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        
+        int row = table.getSelectedRow();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Pilih user dulu!");
+            return;
+        }
+        
+        String userName = getSafeString(model.getValueAt(row, 1));
+        String userCode = getSafeString(model.getValueAt(row, 0));
+        
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Hapus user: " + userName + " (" + userCode + ")?", 
+            "Konfirmasi Hapus", JOptionPane.YES_NO_OPTION);
+            
         if (confirm != JOptionPane.YES_OPTION) return;
 
         try (Connection conn = Database.getConnection()) {
             String sql = "DELETE FROM users WHERE user_code=?";
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setString(1, selectedCode);
-            ps.executeUpdate();
-            JOptionPane.showMessageDialog(this, "User berhasil dihapus!");
-            loadData();
+            int affected = ps.executeUpdate();
+            
+            if (affected > 0) {
+                JOptionPane.showMessageDialog(this, "User berhasil dihapus!");
+                loadData();
+            } else {
+                JOptionPane.showMessageDialog(this, "Gagal hapus user!");
+            }
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this, "Gagal hapus user!\n" + e.getMessage());
+            e.printStackTrace();
         }
     }
 
