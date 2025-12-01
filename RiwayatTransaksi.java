@@ -265,87 +265,228 @@ public class RiwayatTransaksi extends JFrame {
         }
     }
 
-    private void showDetailTransaksi() {
-        int selectedRow = table.getSelectedRow();
-        if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Pilih transaksi terlebih dahulu!");
-            return;
-        }
-
-        String kodeTransaksi = (String) table.getValueAt(selectedRow, 0);
-        String tanggal = (String) table.getValueAt(selectedRow, 1);
-        String waktu = (String) table.getValueAt(selectedRow, 2);
-
-        try (Connection conn = Database.getConnection()) {
-            String sql = "SELECT " +
-                        "t.kode_transaksi, t.total, t.status, " +
-                        "u.nama AS nama_kasir, u.username, u.shift, " +
-                        "p.nama_produk, k.nama_kategori, " +
-                        "d.qty, d.harga, d.subtotal " +
-                        "FROM transaksi t " +
-                        "JOIN users u ON t.kasir_id = u.id " +
-                        "JOIN detail_transaksi d ON t.id = d.transaksi_id " +
-                        "JOIN produk p ON d.produk_id = p.id " +
-                        "JOIN kategori k ON p.kategori_id = k.id " +
-                        "WHERE t.kode_transaksi = ? " +
-                        "ORDER BY p.nama_produk";
-
-            PreparedStatement pst = conn.prepareStatement(sql);
-            pst.setString(1, kodeTransaksi);
-            ResultSet rs = pst.executeQuery();
-
-            StringBuilder detail = new StringBuilder();
-            double totalTransaksi = 0;
-            boolean firstRow = true;
-
-            while (rs.next()) {
-                if (firstRow) {
-                    detail.append("=== DETAIL TRANSAKSI ===\n\n");
-                    detail.append("Kode Transaksi: ").append(rs.getString("kode_transaksi")).append("\n");
-                    detail.append("Tanggal       : ").append(tanggal).append(" ").append(waktu).append("\n");
-                    detail.append("Kasir         : ").append(rs.getString("nama_kasir")).append("\n");
-                    detail.append("Username      : ").append(rs.getString("username")).append("\n");
-                    detail.append("Shift         : ").append(rs.getString("shift")).append("\n");
-                    detail.append("Status        : ").append(rs.getString("status")).append("\n");
-                    detail.append("\n=== ITEM PEMBELIAN ===\n\n");
-                    firstRow = false;
-                }
-
-                String produk = rs.getString("nama_produk");
-                String kategori = rs.getString("nama_kategori");
-                int qty = rs.getInt("qty");
-                double harga = rs.getDouble("harga");
-                double subtotal = rs.getDouble("subtotal");
-                totalTransaksi += subtotal;
-
-                detail.append(String.format("Produk   : %s\n", produk));
-                detail.append(String.format("Kategori : %s\n", kategori));
-                detail.append(String.format("Qty      : %d\n", qty));
-                detail.append(String.format("Harga    : Rp %s\n", df.format(harga)));
-                detail.append(String.format("Subtotal : Rp %s\n", df.format(subtotal)));
-                detail.append("────────────────────────\n");
-            }
-
-            if (!firstRow) {
-                detail.append(String.format("\nTOTAL TRANSAKSI: Rp %s", df.format(totalTransaksi)));
-                
-                JTextArea textArea = new JTextArea(detail.toString());
-                textArea.setEditable(false);
-                textArea.setFont(new Font("Consolas", Font.PLAIN, 12));
-                
-                JScrollPane scrollPane = new JScrollPane(textArea);
-                scrollPane.setPreferredSize(new Dimension(500, 400));
-                
-                JOptionPane.showMessageDialog(this, scrollPane, 
-                    "Detail Transaksi - " + kodeTransaksi, 
-                    JOptionPane.INFORMATION_MESSAGE);
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Gagal memuat detail transaksi!");
-        }
+private void showDetailTransaksi() {
+    int selectedRow = table.getSelectedRow();
+    if (selectedRow == -1) {
+        JOptionPane.showMessageDialog(this, "Pilih transaksi terlebih dahulu!", "Peringatan", JOptionPane.WARNING_MESSAGE);
+        return;
     }
+
+    String kodeTransaksi = (String) table.getValueAt(selectedRow, 0);
+    String tanggal = (String) table.getValueAt(selectedRow, 1);
+    String waktu = (String) table.getValueAt(selectedRow, 2);
+
+    try (Connection conn = Database.getConnection()) {
+        String sql = "SELECT " +
+                    "t.kode_transaksi, t.total, t.status, " +
+                    "u.nama AS nama_kasir, u.username, u.shift, " +
+                    "p.nama_produk, k.nama_kategori, " +
+                    "d.qty, d.harga, d.subtotal " +
+                    "FROM transaksi t " +
+                    "JOIN users u ON t.kasir_id = u.id " +
+                    "JOIN detail_transaksi d ON t.id = d.transaksi_id " +
+                    "JOIN produk p ON d.produk_id = p.id " +
+                    "JOIN kategori k ON p.kategori_id = k.id " +
+                    "WHERE t.kode_transaksi = ? " +
+                    "ORDER BY p.nama_produk";
+
+        PreparedStatement pst = conn.prepareStatement(sql);
+        pst.setString(1, kodeTransaksi);
+        ResultSet rs = pst.executeQuery();
+
+        // Buat panel khusus dengan desain seperti struk
+        JPanel panelStruk = new JPanel(new BorderLayout(0, 0));
+        panelStruk.setBackground(Color.WHITE);
+        panelStruk.setPreferredSize(new Dimension(500, 450));
+
+        // ================= HEADER STRUK =================
+        JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        headerPanel.setBackground(new Color(0, 102, 204));
+        headerPanel.setPreferredSize(new Dimension(500, 70));
+        
+        // Load logo
+        ImageIcon logoIcon = null;
+        try {
+            logoIcon = new ImageIcon(getClass().getResource("/img/logo.jpg"));
+            if (logoIcon != null) {
+                Image img = logoIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
+                logoIcon = new ImageIcon(img);
+            }
+        } catch (Exception e) {
+            // Jika logo tidak ada, gunakan icon default
+            System.out.println("Logo tidak ditemukan, menggunakan icon default");
+        }
+        
+        JLabel lblLogo = new JLabel();
+        if (logoIcon != null) {
+            lblLogo.setIcon(logoIcon);
+        }
+        
+        JLabel lblNamaToko = new JLabel("TOKO KOMPUTER BYNEST");
+        lblNamaToko.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        lblNamaToko.setForeground(Color.WHITE);
+        
+        headerPanel.add(lblLogo);
+        headerPanel.add(lblNamaToko);
+        panelStruk.add(headerPanel, BorderLayout.NORTH);
+
+        // ================= BODY STRUK =================
+        JPanel bodyPanel = new JPanel(new BorderLayout(0, 10));
+        bodyPanel.setBackground(Color.WHITE);
+        bodyPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+
+        // Informasi transaksi
+        JPanel infoPanel = new JPanel(new GridLayout(0, 1, 5, 5));
+        infoPanel.setBackground(Color.WHITE);
+        
+        JLabel lblJudul = new JLabel("📋 DETAIL TRANSAKSI", JLabel.CENTER);
+        lblJudul.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lblJudul.setForeground(new Color(0, 102, 204));
+        
+        JLabel lblKode = new JLabel("Kode: " + kodeTransaksi);
+        lblKode.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        
+        JLabel lblWaktu = new JLabel("Tanggal: " + tanggal + " " + waktu);
+        lblWaktu.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        
+        infoPanel.add(lblJudul);
+        infoPanel.add(lblKode);
+        infoPanel.add(lblWaktu);
+        
+        bodyPanel.add(infoPanel, BorderLayout.NORTH);
+
+        // ================= TABEL ITEM =================
+        String[] columnNames = {"Produk", "Kategori", "Qty", "Harga", "Subtotal"};
+        DefaultTableModel modelDetail = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        JTable tableDetail = new JTable(modelDetail);
+        tableDetail.setRowHeight(25);
+        tableDetail.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        tableDetail.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
+        tableDetail.getTableHeader().setBackground(new Color(240, 240, 240));
+        tableDetail.getTableHeader().setForeground(Color.DARK_GRAY);
+        
+        // Set alignment untuk kolom angka
+        DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
+        rightRenderer.setHorizontalAlignment(SwingConstants.RIGHT);
+        
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        tableDetail.getColumnModel().getColumn(2).setCellRenderer(centerRenderer); // Qty
+        tableDetail.getColumnModel().getColumn(3).setCellRenderer(rightRenderer); // Harga
+        tableDetail.getColumnModel().getColumn(4).setCellRenderer(rightRenderer); // Subtotal
+        
+        JScrollPane scrollPane = new JScrollPane(tableDetail);
+        scrollPane.setPreferredSize(new Dimension(450, 200));
+        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200)));
+        
+        bodyPanel.add(scrollPane, BorderLayout.CENTER);
+
+        // ================= FOOTER =================
+        JPanel footerPanel = new JPanel(new BorderLayout(0, 10));
+        footerPanel.setBackground(Color.WHITE);
+        
+        double totalTransaksi = 0;
+        String namaKasir = "";
+        String shiftKasir = "";
+        String status = "";
+        boolean firstRow = true;
+
+        while (rs.next()) {
+            if (firstRow) {
+                namaKasir = rs.getString("nama_kasir");
+                shiftKasir = rs.getString("shift");
+                status = rs.getString("status");
+                totalTransaksi = rs.getDouble("total");
+                
+                // Tambahkan info kasir di info panel
+                JLabel lblKasir = new JLabel("Kasir: " + namaKasir + " (" + rs.getString("username") + ")");
+                lblKasir.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                infoPanel.add(lblKasir);
+                
+                JLabel lblShift = new JLabel("Shift: " + shiftKasir);
+                lblShift.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                infoPanel.add(lblShift);
+                
+                JLabel lblStatus = new JLabel("Status: " + status);
+                lblStatus.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                infoPanel.add(lblStatus);
+                
+                // Garis pemisah
+                JSeparator separator = new JSeparator();
+                separator.setForeground(new Color(0, 102, 204));
+                infoPanel.add(separator);
+                
+                firstRow = false;
+            }
+
+            String produk = rs.getString("nama_produk");
+            String kategori = rs.getString("nama_kategori");
+            int qty = rs.getInt("qty");
+            double harga = rs.getDouble("harga");
+            double subtotal = rs.getDouble("subtotal");
+
+            modelDetail.addRow(new Object[]{
+                produk,
+                kategori,
+                qty,
+                "Rp " + df.format(harga),
+                "Rp " + df.format(subtotal)
+            });
+        }
+
+        // Panel total
+        JPanel totalPanel = new JPanel(new BorderLayout());
+        totalPanel.setBackground(Color.WHITE);
+        totalPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+        
+        JLabel lblTotal = new JLabel("TOTAL TRANSAKSI: Rp " + df.format(totalTransaksi));
+        lblTotal.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lblTotal.setForeground(new Color(0, 102, 204));
+        lblTotal.setHorizontalAlignment(SwingConstants.RIGHT);
+        
+        totalPanel.add(lblTotal, BorderLayout.EAST);
+        footerPanel.add(totalPanel, BorderLayout.NORTH);
+        
+        // Garis footer
+        JSeparator footerSeparator = new JSeparator();
+        footerSeparator.setForeground(new Color(0, 102, 204));
+        footerPanel.add(footerSeparator, BorderLayout.CENTER);
+        
+        // Pesan terima kasih
+        JLabel lblThanks = new JLabel("Terima kasih telah berbelanja di BYNEST", JLabel.CENTER);
+        lblThanks.setFont(new Font("Segoe UI", Font.ITALIC, 11));
+        lblThanks.setForeground(Color.GRAY);
+        lblThanks.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
+        footerPanel.add(lblThanks, BorderLayout.SOUTH);
+        
+        bodyPanel.add(footerPanel, BorderLayout.SOUTH);
+        panelStruk.add(bodyPanel, BorderLayout.CENTER);
+
+        // ================= TAMPILKAN DENGAN JOPTIONPANE =================
+        JOptionPane.showMessageDialog(
+            this, 
+            panelStruk, 
+            "Detail Transaksi - " + kodeTransaksi, 
+            JOptionPane.PLAIN_MESSAGE
+        );
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        JOptionPane.showMessageDialog(
+            this, 
+            "Gagal memuat detail transaksi!\n" + e.getMessage(),
+            "Error", 
+            JOptionPane.ERROR_MESSAGE
+        );
+    }
+}
 
     public static void main(String[] args){
         String kasirLogin = "kasir1";

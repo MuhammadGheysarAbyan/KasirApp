@@ -185,39 +185,44 @@ public class ManajemenUser extends JFrame {
         return value == null ? "" : value.toString();
     }
 
-    // Untuk display di tabel (bisa panjang)
+    // Untuk display di tabel (tampilan user friendly)
     private String normalizeShiftDisplay(String shift) {
-        if (shift == null) return "Pagi";
+        if (shift == null || shift.trim().isEmpty()) return "Pagi";
         
         shift = shift.trim().toLowerCase();
-        if (shift.contains("pagi") || shift.equals("s1") || shift.equals("1") || shift.equals("shift 1")) {
+        if (shift.contains("24") || shift.contains("admin") || shift.equals("full") || shift.equals("24jam")) {
+            return "24 Jam";
+        } else if (shift.contains("pagi") || shift.equals("s1") || shift.equals("1") || shift.equals("shift 1")) {
             return "Pagi";
         } else if (shift.contains("siang") || shift.equals("s2") || shift.equals("2") || shift.equals("shift 2")) {
             return "Siang";
         } else if (shift.contains("malam") || shift.equals("s3") || shift.equals("3") || shift.equals("shift 3")) {
             return "Malam";
-        } else if (shift.contains("admin") || shift.equals("full") || shift.equals("24 jam") || shift.equals("24")) {
-            return "24 Jam";
         } else {
+            // Kapitalisasi huruf pertama
+            if (!shift.isEmpty()) {
+                return shift.substring(0, 1).toUpperCase() + shift.substring(1);
+            }
             return shift;
         }
     }
 
     // Untuk simpan ke database (harus pendek)
     private String normalizeShiftForDatabase(String shift) {
-        if (shift == null) return "Pagi";
+        if (shift == null || shift.trim().isEmpty()) return "Pagi";
         
         shift = shift.trim().toLowerCase();
-        if (shift.contains("pagi") || shift.equals("s1") || shift.equals("1") || shift.equals("shift 1")) {
-            return "Pagi";
+        if (shift.contains("24") || shift.contains("admin") || shift.contains("jam")) {
+            return "24 Jam"; // Simpan sebagai "24 Jam" (6 karakter termasuk spasi)
+        } else if (shift.contains("pagi") || shift.equals("s1") || shift.equals("1") || shift.equals("shift 1")) {
+            return "Pagi"; // 4 karakter
         } else if (shift.contains("siang") || shift.equals("s2") || shift.equals("2") || shift.equals("shift 2")) {
-            return "Siang";
+            return "Siang"; // 5 karakter
         } else if (shift.contains("malam") || shift.equals("s3") || shift.equals("3") || shift.equals("shift 3")) {
-            return "Malam";
-        } else if (shift.contains("admin") || shift.equals("full") || shift.equals("24 jam") || shift.equals("24") || shift.contains("24 jam")) {
-            return "Admin"; // Simpan sebagai "Admin" saja ke database
+            return "Malam"; // 5 karakter
         } else {
-            return shift;
+            // Potong jika terlalu panjang (maks 10 karakter)
+            return shift.length() > 10 ? shift.substring(0, 10) : shift;
         }
     }
 
@@ -275,8 +280,8 @@ public class ManajemenUser extends JFrame {
             cbShift.removeAllItems();
             
             if ("admin".equalsIgnoreCase(selectedRole)) {
-                // SHIFT KHUSUS ADMIN - 24 Jam
-                cbShift.addItem("24 Jam (Admin)");
+                // SHIFT KHUSUS ADMIN
+                cbShift.addItem("24 Jam");
             } else {
                 // SHIFT BIASA UNTUK KASIR
                 cbShift.addItem("Pagi");
@@ -286,7 +291,7 @@ public class ManajemenUser extends JFrame {
             
             // Set default value
             if ("admin".equalsIgnoreCase(selectedRole)) {
-                cbShift.setSelectedItem("24 Jam (Admin)");
+                cbShift.setSelectedItem("24 Jam");
             } else {
                 cbShift.setSelectedItem("Pagi");
             }
@@ -374,7 +379,7 @@ public class ManajemenUser extends JFrame {
                     ps.setString(6, email);
                     ps.setString(7, noTelp);
                     ps.setString(8, alamat);
-                    ps.setString(9, shiftForDB); // Simpan versi pendek ke database
+                    ps.setString(9, shiftForDB);
 
                     int affected = ps.executeUpdate();
                     if (affected > 0) {
@@ -440,8 +445,8 @@ public class ManajemenUser extends JFrame {
             cbShift.removeAllItems();
             
             if ("admin".equalsIgnoreCase(selectedRole)) {
-                // SHIFT KHUSUS ADMIN - 24 Jam
-                cbShift.addItem("24 Jam (Admin)");
+                // SHIFT KHUSUS ADMIN
+                cbShift.addItem("24 Jam");
             } else {
                 // SHIFT BIASA UNTUK KASIR
                 cbShift.addItem("Pagi");
@@ -451,18 +456,18 @@ public class ManajemenUser extends JFrame {
             
             // Set shift yang sesuai dengan data awal
             if ("admin".equalsIgnoreCase(selectedRole)) {
-                cbShift.setSelectedItem("24 Jam (Admin)");
+                cbShift.setSelectedItem("24 Jam");
             } else {
                 // Jika sebelumnya admin dan diganti ke kasir, set default Pagi
                 if ("admin".equalsIgnoreCase(roleAwal) && "kasir".equalsIgnoreCase(selectedRole)) {
                     cbShift.setSelectedItem("Pagi");
                 } else {
                     // Pertahankan shift yang ada jika tersedia
-                    String normalizedShift = normalizeShiftDisplay(shiftDisplayAwal);
+                    String normalizedShift = normalizeShiftForDatabase(shiftDisplayAwal);
                     if (cbShift.getItemCount() > 0) {
                         boolean shiftExists = false;
                         for (int i = 0; i < cbShift.getItemCount(); i++) {
-                            if (cbShift.getItemAt(i).equals(normalizedShift)) {
+                            if (cbShift.getItemAt(i).equalsIgnoreCase(normalizedShift)) {
                                 shiftExists = true;
                                 break;
                             }
@@ -531,6 +536,9 @@ public class ManajemenUser extends JFrame {
                 String shiftDisplay = (String) cbShift.getSelectedItem();
                 String shiftForDB = normalizeShiftForDatabase(shiftDisplay);
 
+                System.out.println("Debug - Shift untuk database: '" + shiftForDB + "' (length: " + shiftForDB.length() + ")");
+
+                // Pastikan kolom shift cukup panjang (minimal VARCHAR(10))
                 String sql = "UPDATE users SET nama=?, username=?, password=?, role=?, email=?, no_telp=?, alamat=?, shift=? WHERE user_code=?";
                 PreparedStatement ps = conn.prepareStatement(sql);
                 ps.setString(1, tfNama.getText().trim());
@@ -540,7 +548,7 @@ public class ManajemenUser extends JFrame {
                 ps.setString(5, tfEmail.getText().trim());
                 ps.setString(6, tfNoTelp.getText().trim());
                 ps.setString(7, tfAlamat.getText().trim());
-                ps.setString(8, shiftForDB); // Simpan versi pendek ke database
+                ps.setString(8, shiftForDB);
                 ps.setString(9, kodeUserAwal);
 
                 int affected = ps.executeUpdate();
@@ -550,6 +558,17 @@ public class ManajemenUser extends JFrame {
                 } else {
                     JOptionPane.showMessageDialog(this, "Gagal update data user!");
                 }
+            } catch (SQLException e) {
+                if (e.getMessage().contains("Data truncated")) {
+                    // Jika masih error, ubah ke nilai yang lebih pendek
+                    JOptionPane.showMessageDialog(this, 
+                        "Error: Kolom shift terlalu pendek di database.\n" +
+                        "Perbaiki struktur tabel dengan:\n" +
+                        "ALTER TABLE users MODIFY shift VARCHAR(20);");
+                } else {
+                    JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+                }
+                e.printStackTrace();
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
                 e.printStackTrace();

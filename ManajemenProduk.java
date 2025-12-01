@@ -627,7 +627,7 @@ searchPanel.add(btnCari);
         cbKategori.setSelectedItem(kategoriAwal);
 
         JButton btnPilihFoto = new JButton("📁 Pilih Foto Baru");
-        JLabel lblFoto = new JLabel("Foto tidak diubah");
+        JLabel lblFoto = new JLabel("");
         lblFoto.setForeground(Color.GRAY);
         final String[] pathFoto = {null};
 
