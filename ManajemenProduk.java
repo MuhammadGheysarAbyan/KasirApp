@@ -406,9 +406,10 @@ searchPanel.add(btnCari);
                 ImageIcon imgIcon = createPlaceholderIcon();
                 if (fotoPath != null && !fotoPath.trim().isEmpty()) {
                     try {
-                        File file = new File(fotoPath);
+                        String fixedPath = resolveImagePath(fotoPath);
+                        File file = new File(fixedPath);
                         if (file.exists()) {
-                            Image img = new ImageIcon(fotoPath).getImage()
+                            Image img = new ImageIcon(fixedPath).getImage()
                                     .getScaledInstance(50, 50, Image.SCALE_SMOOTH);
                             imgIcon = new ImageIcon(img);
                         }
@@ -853,5 +854,25 @@ searchPanel.add(btnCari);
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new ManajemenProduk("Admin").setVisible(true));
+    }
+
+    private String resolveImagePath(String dbPath) {
+        if (dbPath == null) return null;
+        File f = new File(dbPath);
+        if (f.exists() && f.isAbsolute()) {
+            return dbPath;
+        }
+        // Try looking in src/img
+        String relativePath = "src/img/" + new File(dbPath).getName();
+        if (new File(relativePath).exists()) {
+            return relativePath;
+        }
+        // Try looking in current dir (if src is not needed)
+        String localPath = "img/" + new File(dbPath).getName();
+        if (new File(localPath).exists()) {
+            return localPath;
+        }
+        // Fallback to absolute path constructed from project dir
+        return System.getProperty("user.dir") + "/src/img/" + new File(dbPath).getName();
     }
 }

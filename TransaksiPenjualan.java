@@ -34,12 +34,12 @@ public class TransaksiPenjualan extends JFrame {
                 super.paintComponent(g);
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-                GradientPaint gp = new GradientPaint(0, 0, new Color(0,102,204), 0, getHeight(), Color.WHITE);
+                GradientPaint gp = new GradientPaint(0, 0, new Color(0, 102, 204), 0, getHeight(), Color.WHITE);
                 g2.setPaint(gp);
-                g2.fillRect(0,0,getWidth(),getHeight());
+                g2.fillRect(0, 0, getWidth(), getHeight());
             }
         };
-        mainPanel.setLayout(new BorderLayout(10,10));
+        mainPanel.setLayout(new BorderLayout(10, 10));
         add(mainPanel);
 
         // ================= HEADER =================
@@ -51,25 +51,25 @@ public class TransaksiPenjualan extends JFrame {
             lblHeader = new JLabel("Transaksi Penjualan", iconHeader, JLabel.CENTER);
             lblHeader.setHorizontalTextPosition(SwingConstants.RIGHT);
             lblHeader.setIconTextGap(15);
-        } catch(Exception e){
+        } catch (Exception e) {
             lblHeader = new JLabel("Transaksi Penjualan", JLabel.CENTER);
         }
         lblHeader.setFont(new Font("Segoe UI", Font.BOLD, 32));
         lblHeader.setForeground(Color.WHITE);
-        lblHeader.setBorder(BorderFactory.createEmptyBorder(20,0,20,0));
+        lblHeader.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
         mainPanel.add(lblHeader, BorderLayout.NORTH);
 
         // ================= PANEL TENGAH =================
-        JPanel centerPanel = new JPanel(new GridLayout(1,2,10,10));
+        JPanel centerPanel = new JPanel(new GridLayout(1, 2, 10, 10));
         centerPanel.setOpaque(false);
 
         // ===== PANEL PRODUK =====
-        JPanel panelProduk = new JPanel(new BorderLayout(5,5));
+        JPanel panelProduk = new JPanel(new BorderLayout(5, 5));
         panelProduk.setOpaque(false);
 
         txtCari = new JTextField();
         JButton btnCari = new JButton("🔍 Cari");
-        btnCari.setBackground(new Color(0,153,255));
+        btnCari.setBackground(new Color(0, 153, 255));
         btnCari.setForeground(Color.WHITE);
         btnCari.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
@@ -79,12 +79,16 @@ public class TransaksiPenjualan extends JFrame {
         searchPanel.add(btnCari, BorderLayout.EAST);
         panelProduk.add(searchPanel, BorderLayout.NORTH);
 
-        modelProduk = new DefaultTableModel(new String[]{"Kode Produk","Nama","Kategori","Harga","Stok","Foto"},0){
+        modelProduk = new DefaultTableModel(new String[] { "Kode Produk", "Nama", "Kategori", "Harga", "Stok", "Foto" },
+                0) {
             @Override
-            public boolean isCellEditable(int row, int col){ return false; }
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+
             @Override
-            public Class<?> getColumnClass(int col){
-                return col==5 ? ImageIcon.class : Object.class;
+            public Class<?> getColumnClass(int col) {
+                return col == 5 ? ImageIcon.class : Object.class;
             }
         };
         tableProduk = new JTable(modelProduk);
@@ -93,26 +97,30 @@ public class TransaksiPenjualan extends JFrame {
         panelProduk.add(spProduk, BorderLayout.CENTER);
 
         JButton btnTambahKeranjang = new JButton("➕ Tambah ke Keranjang");
-        btnTambahKeranjang.setBackground(new Color(0,204,102));
+        btnTambahKeranjang.setBackground(new Color(0, 204, 102));
         btnTambahKeranjang.setForeground(Color.WHITE);
         btnTambahKeranjang.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         JPanel bottomPanelProduk = new JPanel(new BorderLayout());
         bottomPanelProduk.setOpaque(false);
-        bottomPanelProduk.setBorder(BorderFactory.createEmptyBorder(0,0,36,0));
+        bottomPanelProduk.setBorder(BorderFactory.createEmptyBorder(0, 0, 36, 0));
         bottomPanelProduk.add(btnTambahKeranjang, BorderLayout.CENTER);
         panelProduk.add(bottomPanelProduk, BorderLayout.SOUTH);
 
         // ===== PANEL KERANJANG =====
-        JPanel panelKeranjang = new JPanel(new BorderLayout(5,5));
+        JPanel panelKeranjang = new JPanel(new BorderLayout(5, 5));
         panelKeranjang.setOpaque(false);
 
-        modelKeranjang = new DefaultTableModel(new String[]{"Kode Produk","Nama","Harga","Jumlah","Subtotal","Foto"},0){
+        modelKeranjang = new DefaultTableModel(
+                new String[] { "Kode Produk", "Nama", "Harga", "Jumlah", "Subtotal", "Foto" }, 0) {
             @Override
-            public boolean isCellEditable(int row, int col){ return false; }
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+
             @Override
-            public Class<?> getColumnClass(int col){
-                return col==5 ? ImageIcon.class : Object.class;
+            public Class<?> getColumnClass(int col) {
+                return col == 5 ? ImageIcon.class : Object.class;
             }
         };
         tableKeranjang = new JTable(modelKeranjang);
@@ -120,29 +128,33 @@ public class TransaksiPenjualan extends JFrame {
         JScrollPane spKeranjang = new JScrollPane(tableKeranjang);
         panelKeranjang.add(spKeranjang, BorderLayout.CENTER);
 
-        JPanel bottomKeranjang = new JPanel(new GridLayout(4,2,10,10));
+        JPanel bottomKeranjang = new JPanel(new GridLayout(4, 2, 10, 10));
         bottomKeranjang.setOpaque(false);
-        txtTotal = new JTextField("Rp 0"); txtTotal.setEditable(false);
+        txtTotal = new JTextField("Rp 0");
+        txtTotal.setEditable(false);
         txtBayar = new JTextField();
 
         JButton btnBayar = new JButton("💵 Bayar");
-        btnBayar.setBackground(new Color(0,102,204));
+        btnBayar.setBackground(new Color(0, 102, 204));
         btnBayar.setForeground(Color.WHITE);
         btnBayar.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         JButton btnHapus = new JButton("❌ Batal");
-        btnHapus.setBackground(new Color(255,77,77));
+        btnHapus.setBackground(new Color(255, 77, 77));
         btnHapus.setForeground(Color.WHITE);
         btnHapus.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         JButton btnBack = new JButton("⬅️ Kembali");
-        btnBack.setBackground(new Color(153,153,153));
+        btnBack.setBackground(new Color(153, 153, 153));
         btnBack.setForeground(Color.WHITE);
         btnBack.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-        bottomKeranjang.add(new JLabel("Total:")); bottomKeranjang.add(txtTotal);
-        bottomKeranjang.add(new JLabel("Bayar:")); bottomKeranjang.add(txtBayar);
-        bottomKeranjang.add(btnBayar); bottomKeranjang.add(btnHapus);
+        bottomKeranjang.add(new JLabel("Total:"));
+        bottomKeranjang.add(txtTotal);
+        bottomKeranjang.add(new JLabel("Bayar:"));
+        bottomKeranjang.add(txtBayar);
+        bottomKeranjang.add(btnBayar);
+        bottomKeranjang.add(btnHapus);
         panelKeranjang.add(bottomKeranjang, BorderLayout.SOUTH);
 
         JPanel topBackPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -174,12 +186,22 @@ public class TransaksiPenjualan extends JFrame {
         // === Auto format input bayar jadi Rupiah ===
         txtBayar.getDocument().addDocumentListener(new DocumentListener() {
             boolean editing = false;
-            public void insertUpdate(DocumentEvent e) { formatBayar(); }
-            public void removeUpdate(DocumentEvent e) { formatBayar(); }
-            public void changedUpdate(DocumentEvent e) { formatBayar(); }
+
+            public void insertUpdate(DocumentEvent e) {
+                formatBayar();
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                formatBayar();
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                formatBayar();
+            }
 
             private void formatBayar() {
-                if (editing) return;
+                if (editing)
+                    return;
                 editing = true;
                 SwingUtilities.invokeLater(() -> {
                     try {
@@ -200,39 +222,51 @@ public class TransaksiPenjualan extends JFrame {
         });
 
         txtCari.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e){ loadProduk(txtCari.getText()); }
-            public void removeUpdate(DocumentEvent e){ loadProduk(txtCari.getText()); }
-            public void changedUpdate(DocumentEvent e){ loadProduk(txtCari.getText()); }
+            public void insertUpdate(DocumentEvent e) {
+                loadProduk(txtCari.getText());
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                loadProduk(txtCari.getText());
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                loadProduk(txtCari.getText());
+            }
         });
     }
 
-    private void loadProduk(String keyword){
+    private void loadProduk(String keyword) {
         modelProduk.setRowCount(0);
-        try(Connection conn = Database.getConnection()){
+        try (Connection conn = Database.getConnection()) {
             String sql = "SELECT p.*, k.nama_kategori FROM produk p " +
-                        "JOIN kategori k ON p.kategori_id = k.id " +
-                        "WHERE p.nama_produk LIKE ? OR p.kode LIKE ? " +
-                        "ORDER BY p.nama_produk";
+                    "JOIN kategori k ON p.kategori_id = k.id " +
+                    "WHERE p.nama_produk LIKE ? OR p.kode LIKE ? " +
+                    "ORDER BY p.nama_produk";
             PreparedStatement pst = conn.prepareStatement(sql);
-            pst.setString(1, "%"+keyword+"%");
-            pst.setString(2, "%"+keyword+"%");
+            pst.setString(1, "%" + keyword + "%");
+            pst.setString(2, "%" + keyword + "%");
             ResultSet rs = pst.executeQuery();
-            while(rs.next()){
+            while (rs.next()) {
                 String kodeProduk = rs.getString("kode");
                 double harga = rs.getDouble("harga");
                 ImageIcon icon = null;
                 try {
                     String path = rs.getString("foto");
                     if (path != null && !path.isEmpty()) {
-                        Image img = new ImageIcon(path).getImage()
-                                .getScaledInstance(60, 60, Image.SCALE_SMOOTH);
-                        icon = new ImageIcon(img);
+                        String fixedPath = resolveImagePath(path);
+                        java.io.File file = new java.io.File(fixedPath);
+                        if (file.exists()) {
+                            Image img = new ImageIcon(fixedPath).getImage()
+                                    .getScaledInstance(60, 60, Image.SCALE_SMOOTH);
+                            icon = new ImageIcon(img);
+                        }
                     }
                 } catch (Exception ex) {
                     System.out.println("Gagal load gambar: " + ex.getMessage());
                 }
 
-                modelProduk.addRow(new Object[]{
+                modelProduk.addRow(new Object[] {
                         kodeProduk,
                         rs.getString("nama_produk"),
                         rs.getString("nama_kategori"),
@@ -241,48 +275,49 @@ public class TransaksiPenjualan extends JFrame {
                         icon
                 });
             }
-        }catch(Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this,"Gagal load produk!");
+            JOptionPane.showMessageDialog(this, "Gagal load produk!");
         }
     }
 
-    private void tambahKeranjang(){
+    private void tambahKeranjang() {
         int row = tableProduk.getSelectedRow();
-        if(row==-1){ 
-            JOptionPane.showMessageDialog(this,"Pilih produk dulu!"); 
-            return; 
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Pilih produk dulu!");
+            return;
         }
 
-        String kode = (String) modelProduk.getValueAt(row,0);
-        String nama = (String) modelProduk.getValueAt(row,1);
-        String hargaStr = modelProduk.getValueAt(row,3).toString().replace("Rp","").replace(".","").trim();
+        String kode = (String) modelProduk.getValueAt(row, 0);
+        String nama = (String) modelProduk.getValueAt(row, 1);
+        String hargaStr = modelProduk.getValueAt(row, 3).toString().replace("Rp", "").replace(".", "").trim();
         double harga = Double.parseDouble(hargaStr);
-        int stok = (int) modelProduk.getValueAt(row,4);
-        ImageIcon foto = (ImageIcon) modelProduk.getValueAt(row,5);
+        int stok = (int) modelProduk.getValueAt(row, 4);
+        ImageIcon foto = (ImageIcon) modelProduk.getValueAt(row, 5);
 
-        String jumlahStr = JOptionPane.showInputDialog(this,"Masukkan jumlah untuk " + nama + ":");
-        if(jumlahStr==null) return;
-        
+        String jumlahStr = JOptionPane.showInputDialog(this, "Masukkan jumlah untuk " + nama + ":");
+        if (jumlahStr == null)
+            return;
+
         try {
             int jumlah = Integer.parseInt(jumlahStr);
-            if(jumlah <= 0){
-                JOptionPane.showMessageDialog(this,"Jumlah harus lebih dari 0!");
+            if (jumlah <= 0) {
+                JOptionPane.showMessageDialog(this, "Jumlah harus lebih dari 0!");
                 return;
             }
-            if(jumlah>stok){ 
-                JOptionPane.showMessageDialog(this,"Stok tidak cukup! Stok tersedia: " + stok); 
-                return; 
+            if (jumlah > stok) {
+                JOptionPane.showMessageDialog(this, "Stok tidak cukup! Stok tersedia: " + stok);
+                return;
             }
 
             // Cek apakah produk sudah ada di keranjang
-            for(int i=0; i<modelKeranjang.getRowCount(); i++){
-                String existingKode = (String) modelKeranjang.getValueAt(i,0);
-                if(existingKode.equals(kode)){
-                    int existingJumlah = (int) modelKeranjang.getValueAt(i,3);
+            for (int i = 0; i < modelKeranjang.getRowCount(); i++) {
+                String existingKode = (String) modelKeranjang.getValueAt(i, 0);
+                if (existingKode.equals(kode)) {
+                    int existingJumlah = (int) modelKeranjang.getValueAt(i, 3);
                     int newJumlah = existingJumlah + jumlah;
-                    if(newJumlah > stok){
-                        JOptionPane.showMessageDialog(this,"Total jumlah melebihi stok! Stok tersedia: " + stok);
+                    if (newJumlah > stok) {
+                        JOptionPane.showMessageDialog(this, "Total jumlah melebihi stok! Stok tersedia: " + stok);
                         return;
                     }
                     // Update jumlah dan subtotal
@@ -296,39 +331,39 @@ public class TransaksiPenjualan extends JFrame {
 
             // Jika produk belum ada di keranjang, tambahkan baru
             double subtotal = harga * jumlah;
-            modelKeranjang.addRow(new Object[]{
-                kode, nama, "Rp "+df.format(harga), jumlah, "Rp "+df.format(subtotal), foto
+            modelKeranjang.addRow(new Object[] {
+                    kode, nama, "Rp " + df.format(harga), jumlah, "Rp " + df.format(subtotal), foto
             });
             hitungTotal();
-            
-        } catch(NumberFormatException e){
-            JOptionPane.showMessageDialog(this,"Masukkan jumlah yang valid!");
+
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Masukkan jumlah yang valid!");
         }
     }
 
-    private void hitungTotal(){
-        double total=0;
-        for(int i=0;i<modelKeranjang.getRowCount();i++){
-            String subStr = modelKeranjang.getValueAt(i,4).toString().replace("Rp","").replace(".","").trim();
+    private void hitungTotal() {
+        double total = 0;
+        for (int i = 0; i < modelKeranjang.getRowCount(); i++) {
+            String subStr = modelKeranjang.getValueAt(i, 4).toString().replace("Rp", "").replace(".", "").trim();
             total += Double.parseDouble(subStr);
         }
         txtTotal.setText("Rp " + df.format(total));
     }
 
     private void bayar() {
-        if(modelKeranjang.getRowCount() == 0){
+        if (modelKeranjang.getRowCount() == 0) {
             JOptionPane.showMessageDialog(this, "Keranjang kosong!", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
         try {
-            double total = Double.parseDouble(txtTotal.getText().replace("Rp","").replace(".","").trim());
-            if(txtBayar.getText().trim().isEmpty()){
+            double total = Double.parseDouble(txtTotal.getText().replace("Rp", "").replace(".", "").trim());
+            if (txtBayar.getText().trim().isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Masukkan jumlah pembayaran!", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            
-            double bayar = Double.parseDouble(txtBayar.getText().replace("Rp","").replace(".","").trim());
+
+            double bayar = Double.parseDouble(txtBayar.getText().replace("Rp", "").replace(".", "").trim());
             if (bayar < total) {
                 JOptionPane.showMessageDialog(this, "Uang tidak cukup!", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
@@ -357,7 +392,7 @@ public class TransaksiPenjualan extends JFrame {
 
                 // Insert ke tabel transaksi
                 String sqlTrans = "INSERT INTO transaksi (kode_transaksi, total, tanggal, kasir_id, status, waktu) " +
-                                 "VALUES (?, ?, CURDATE(), ?, 'selesai', CURTIME())";
+                        "VALUES (?, ?, CURDATE(), ?, 'selesai', CURTIME())";
                 PreparedStatement pstTrans = conn.prepareStatement(sqlTrans, Statement.RETURN_GENERATED_KEYS);
                 pstTrans.setString(1, kodeTransaksi);
                 pstTrans.setDouble(2, total);
@@ -374,7 +409,8 @@ public class TransaksiPenjualan extends JFrame {
                 for (int i = 0; i < modelKeranjang.getRowCount(); i++) {
                     String kodeProduk = (String) modelKeranjang.getValueAt(i, 0);
                     int qty = (int) modelKeranjang.getValueAt(i, 3);
-                    String hargaStr = modelKeranjang.getValueAt(i, 2).toString().replace("Rp","").replace(".","").trim();
+                    String hargaStr = modelKeranjang.getValueAt(i, 2).toString().replace("Rp", "").replace(".", "")
+                            .trim();
                     double harga = Double.parseDouble(hargaStr);
 
                     // Dapatkan ID produk dari kode
@@ -389,7 +425,7 @@ public class TransaksiPenjualan extends JFrame {
 
                     // Insert detail transaksi TANPA kolom subtotal (karena generated column)
                     String sqlDet = "INSERT INTO detail_transaksi (transaksi_id, produk_id, qty, harga) " +
-                                   "VALUES (?, ?, ?, ?)";
+                            "VALUES (?, ?, ?, ?)";
                     PreparedStatement pstDet = conn.prepareStatement(sqlDet);
                     pstDet.setInt(1, idTransaksi);
                     pstDet.setInt(2, idProduk);
@@ -458,7 +494,7 @@ public class TransaksiPenjualan extends JFrame {
         if (rs.next()) {
             count = rs.getInt("count") + 1;
         }
-        
+
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyMMdd");
         String datePart = sdf.format(new java.util.Date());
         return "TRX-" + datePart + "-" + String.format("%03d", count);
@@ -573,5 +609,26 @@ public class TransaksiPenjualan extends JFrame {
 
     public static void main(String[] args) {
         new TransaksiPenjualan("admin").setVisible(true);
+    }
+
+    private String resolveImagePath(String dbPath) {
+        if (dbPath == null)
+            return null;
+        java.io.File f = new java.io.File(dbPath);
+        if (f.exists() && f.isAbsolute()) {
+            return dbPath;
+        }
+        // Try looking in src/img
+        String relativePath = "src/img/" + new java.io.File(dbPath).getName();
+        if (new java.io.File(relativePath).exists()) {
+            return relativePath;
+        }
+        // Try looking in current dir (if src is not needed)
+        String localPath = "img/" + new java.io.File(dbPath).getName();
+        if (new java.io.File(localPath).exists()) {
+            return localPath;
+        }
+        // Fallback to absolute path constructed from project dir
+        return System.getProperty("user.dir") + "/src/img/" + new java.io.File(dbPath).getName();
     }
 }

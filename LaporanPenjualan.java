@@ -68,15 +68,15 @@ public class LaporanPenjualan extends JFrame {
         statsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
         statsPanel.setOpaque(false);
         statsPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
-        
+
         lblTotalOmset = createStatCard("Total Omset", "Rp 0", new Color(0, 102, 204));
         lblTotalTransaksi = createStatCard("Total Transaksi", "0", new Color(40, 167, 69));
         lblRataTransaksi = createStatCard("Rata-rata/Transaksi", "Rp 0", new Color(255, 193, 7));
-        
+
         statsPanel.add(lblTotalOmset);
         statsPanel.add(lblTotalTransaksi);
         statsPanel.add(lblRataTransaksi);
-        
+
         mainPanel.add(statsPanel, BorderLayout.CENTER);
 
         // ================= CONTENT BOX =================
@@ -93,19 +93,19 @@ public class LaporanPenjualan extends JFrame {
         filterBox.setOpaque(false);
 
         // ComboBox untuk jenis filter
-        comboFilter = new JComboBox<>(new String[]{"Semua", "Harian", "Bulanan", "Rentang Tanggal"});
+        comboFilter = new JComboBox<>(new String[] { "Semua", "Harian", "Bulanan", "Rentang Tanggal" });
         comboFilter.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        
+
         // ComboBox untuk kasir
-        comboKasir = new JComboBox<>(new String[]{"Semua Kasir"});
+        comboKasir = new JComboBox<>(new String[] { "Semua Kasir" });
         comboKasir.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        
+
         // ComboBox untuk kategori
-        comboKategori = new JComboBox<>(new String[]{"Semua Kategori"});
+        comboKategori = new JComboBox<>(new String[] { "Semua Kategori" });
         comboKategori.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        
+
         // ComboBox untuk status transaksi
-        comboStatus = new JComboBox<>(new String[]{"Semua Status", "selesai", "pending", "dibatalkan"});
+        comboStatus = new JComboBox<>(new String[] { "Semua Status", "selesai", "pending", "dibatalkan" });
         comboStatus.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
         dariTanggal = new JSpinner(new SpinnerDateModel());
@@ -138,13 +138,15 @@ public class LaporanPenjualan extends JFrame {
 
         // ================= TABEL =================
         model = new DefaultTableModel(
-                new String[]{
-                    "Foto Produk", "Kode Produk", "Nama Produk", "Kategori", 
-                    "Harga Satuan", "Qty Terjual", "Total Harga", "Kasir", 
-                    "Status", "Tanggal Transaksi"
-                }, 0
-        ) {
-            public boolean isCellEditable(int row, int column) { return false; }
+                new String[] {
+                        "Foto Produk", "Kode Produk", "Nama Produk", "Kategori",
+                        "Harga Satuan", "Qty Terjual", "Total Harga", "Kasir",
+                        "Status", "Tanggal Transaksi"
+                }, 0) {
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+
             public Class<?> getColumnClass(int columnIndex) {
                 return columnIndex == 0 ? ImageIcon.class : Object.class;
             }
@@ -158,7 +160,7 @@ public class LaporanPenjualan extends JFrame {
         // Center alignment untuk beberapa kolom
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-        
+
         // Right alignment untuk kolom numeric
         DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
         rightRenderer.setHorizontalAlignment(SwingConstants.RIGHT);
@@ -177,17 +179,17 @@ public class LaporanPenjualan extends JFrame {
         // ================= BUTTON PANEL =================
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
         btnPanel.setOpaque(false);
-        
+
         // TOMBOL DETAIL TRANSAKSI - WARNA UNGU (dipindah ke kiri)
         JButton btnDetail = createButton("Detail Transaksi", "/img/detail.png", new Color(128, 0, 128)); // Warna ungu
-        
+
         // TOMBOL KEMBALI (dipindah ke kanan)
         JButton btnBack = createButton("Kembali", "/img/back.png", new Color(153, 153, 153));
-        
+
         // Urutan tombol ditukar: Detail dulu, kemudian Kembali
         btnPanel.add(btnDetail);
         btnPanel.add(btnBack);
-        
+
         mainPanel.add(btnPanel, BorderLayout.SOUTH);
 
         // ================= EVENT HANDLERS =================
@@ -197,7 +199,7 @@ public class LaporanPenjualan extends JFrame {
         });
 
         btnDetail.addActionListener(e -> showDetailTransaksi());
-        
+
         btnExport.addActionListener(e -> exportToExcel());
 
         // ================= LOAD DATA AWAL =================
@@ -208,7 +210,7 @@ public class LaporanPenjualan extends JFrame {
 
         // ================= AKSI FILTER =================
         btnFilter.addActionListener(e -> applyFilter());
-        
+
         btnReset.addActionListener(e -> {
             comboFilter.setSelectedIndex(0);
             comboKasir.setSelectedIndex(0);
@@ -242,27 +244,26 @@ public class LaporanPenjualan extends JFrame {
         JPanel card = new JPanel(new BorderLayout(5, 5));
         card.setBackground(Color.WHITE);
         card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(color, 2),
-            BorderFactory.createEmptyBorder(10, 15, 10, 15)
-        ));
-        
+                BorderFactory.createLineBorder(color, 2),
+                BorderFactory.createEmptyBorder(10, 15, 10, 15)));
+
         JLabel titleLabel = new JLabel(title, JLabel.CENTER);
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
         titleLabel.setForeground(color);
-        
+
         JLabel valueLabel = new JLabel(value, JLabel.CENTER);
         valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
         valueLabel.setForeground(Color.DARK_GRAY);
-        
+
         card.add(titleLabel, BorderLayout.NORTH);
         card.add(valueLabel, BorderLayout.CENTER);
-        
+
         JLabel wrapper = new JLabel() {
             @Override
             public String getText() {
                 return value;
             }
-            
+
             @Override
             public void setText(String text) {
                 valueLabel.setText(text);
@@ -270,7 +271,7 @@ public class LaporanPenjualan extends JFrame {
         };
         wrapper.setLayout(new BorderLayout());
         wrapper.add(card);
-        
+
         return wrapper;
     }
 
@@ -284,7 +285,7 @@ public class LaporanPenjualan extends JFrame {
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.DAY_OF_MONTH, 1);
         dariTanggal.setValue(cal.getTime());
-        
+
         cal = Calendar.getInstance();
         cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH));
         sampaiTanggal.setValue(cal.getTime());
@@ -296,18 +297,18 @@ public class LaporanPenjualan extends JFrame {
             String selectedKasir = (String) comboKasir.getSelectedItem();
             String selectedKategori = (String) comboKategori.getSelectedItem();
             String selectedStatus = (String) comboStatus.getSelectedItem();
-            
+
             String kasirUsername = selectedKasir.equals("Semua Kasir") ? null : selectedKasir;
             String kategori = selectedKategori.equals("Semua Kategori") ? null : selectedKategori;
             String status = selectedStatus.equals("Semua Status") ? null : selectedStatus;
 
             java.util.Date dariDate = (java.util.Date) dariTanggal.getValue();
             java.util.Date sampaiDate = (java.util.Date) sampaiTanggal.getValue();
-            
+
             Calendar c = Calendar.getInstance();
             c.setTime(sampaiDate);
             c.add(Calendar.DAY_OF_MONTH, 1);
-            
+
             java.sql.Date sqlDari = new java.sql.Date(dariDate.getTime());
             java.sql.Date sqlSampai = new java.sql.Date(c.getTimeInMillis());
 
@@ -318,7 +319,7 @@ public class LaporanPenjualan extends JFrame {
 
             loadData(sqlDari, sqlSampai, jenisFilter, kasirUsername, kategori, status);
             updateStatistics(sqlDari, sqlSampai, kasirUsername, kategori, status);
-            
+
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Format tanggal tidak valid!\n" + ex.getMessage());
         }
@@ -326,7 +327,8 @@ public class LaporanPenjualan extends JFrame {
 
     private void loadKasirData() {
         try (Connection conn = Database.getConnection()) {
-            if (conn == null) throw new SQLException("Koneksi database gagal!");
+            if (conn == null)
+                throw new SQLException("Koneksi database gagal!");
 
             String sql = "SELECT username FROM users WHERE role = 'kasir' ORDER BY username";
             PreparedStatement pst = conn.prepareStatement(sql);
@@ -343,7 +345,8 @@ public class LaporanPenjualan extends JFrame {
 
     private void loadKategoriData() {
         try (Connection conn = Database.getConnection()) {
-            if (conn == null) throw new SQLException("Koneksi database gagal!");
+            if (conn == null)
+                throw new SQLException("Koneksi database gagal!");
 
             String sql = "SELECT nama_kategori FROM kategori ORDER BY nama_kategori";
             PreparedStatement pst = conn.prepareStatement(sql);
@@ -381,27 +384,28 @@ public class LaporanPenjualan extends JFrame {
         return btn;
     }
 
-    private void loadData(java.sql.Date dari, java.sql.Date sampai, String jenisFilter, 
-                         String kasirUsername, String kategori, String status) {
+    private void loadData(java.sql.Date dari, java.sql.Date sampai, String jenisFilter,
+            String kasirUsername, String kategori, String status) {
         model.setRowCount(0);
 
         try (Connection conn = Database.getConnection()) {
-            if (conn == null) throw new SQLException("Koneksi database gagal!");
+            if (conn == null)
+                throw new SQLException("Koneksi database gagal!");
 
             StringBuilder sql = new StringBuilder();
             sql.append("SELECT ")
-               .append("p.id, p.kode, p.nama_produk, p.foto, p.harga, ")
-               .append("k.nama_kategori, ")
-               .append("SUM(d.qty) AS totalQty, ")
-               .append("SUM(d.qty * d.harga) AS totalHarga, ")
-               .append("u.username AS kasir, u.nama AS nama_kasir, ")
-               .append("t.status, t.tanggal, t.waktu ")
-               .append("FROM transaksi t ")
-               .append("JOIN detail_transaksi d ON t.id = d.transaksi_id ")
-               .append("JOIN produk p ON d.produk_id = p.id ")
-               .append("JOIN kategori k ON p.kategori_id = k.id ")
-               .append("JOIN users u ON t.kasir_id = u.id ")
-               .append("WHERE 1=1 ");
+                    .append("p.id, p.kode, p.nama_produk, p.foto, p.harga, ")
+                    .append("k.nama_kategori, ")
+                    .append("SUM(d.qty) AS totalQty, ")
+                    .append("SUM(d.qty * d.harga) AS totalHarga, ")
+                    .append("u.username AS kasir, u.nama AS nama_kasir, ")
+                    .append("t.status, t.tanggal, t.waktu ")
+                    .append("FROM transaksi t ")
+                    .append("JOIN detail_transaksi d ON t.id = d.transaksi_id ")
+                    .append("JOIN produk p ON d.produk_id = p.id ")
+                    .append("JOIN kategori k ON p.kategori_id = k.id ")
+                    .append("JOIN users u ON t.kasir_id = u.id ")
+                    .append("WHERE 1=1 ");
 
             // Filter berdasarkan tanggal
             if (dari != null && sampai != null && !"Semua".equals(jenisFilter)) {
@@ -424,8 +428,8 @@ public class LaporanPenjualan extends JFrame {
             }
 
             sql.append("GROUP BY p.id, p.kode, p.nama_produk, p.foto, p.harga, ")
-               .append("k.nama_kategori, u.username, u.nama, t.status, t.tanggal, t.waktu ")
-               .append("ORDER BY t.tanggal DESC, t.waktu DESC");
+                    .append("k.nama_kategori, u.username, u.nama, t.status, t.tanggal, t.waktu ")
+                    .append("ORDER BY t.tanggal DESC, t.waktu DESC");
 
             PreparedStatement pst = conn.prepareStatement(sql.toString());
             int paramIndex = 1;
@@ -454,8 +458,13 @@ public class LaporanPenjualan extends JFrame {
                 try {
                     String path = rs.getString("foto");
                     if (path != null && !path.isEmpty()) {
-                        Image img = new ImageIcon(path).getImage().getScaledInstance(60, 60, Image.SCALE_SMOOTH);
-                        foto = new ImageIcon(img);
+                        String fixedPath = resolveImagePath(path);
+                        java.io.File file = new java.io.File(fixedPath);
+                        if (file.exists()) {
+                            Image img = new ImageIcon(fixedPath).getImage()
+                                    .getScaledInstance(60, 60, Image.SCALE_SMOOTH);
+                            foto = new ImageIcon(img);
+                        }
                     }
                 } catch (Exception ex) {
                     System.out.println("Gagal load foto produk: " + ex.getMessage());
@@ -464,17 +473,17 @@ public class LaporanPenjualan extends JFrame {
                 // Format tanggal dan waktu
                 String tanggalWaktu = rs.getDate("tanggal") + " " + rs.getTime("waktu");
 
-                model.addRow(new Object[]{
-                    foto,
-                    rs.getString("kode"),
-                    rs.getString("nama_produk"),
-                    rs.getString("nama_kategori"),
-                    "Rp " + df.format(rs.getDouble("harga")),
-                    rs.getInt("totalQty"),
-                    "Rp " + df.format(rs.getDouble("totalHarga")),
-                    rs.getString("nama_kasir") + " (" + rs.getString("kasir") + ")",
-                    rs.getString("status"),
-                    tanggalWaktu
+                model.addRow(new Object[] {
+                        foto,
+                        rs.getString("kode"),
+                        rs.getString("nama_produk"),
+                        rs.getString("nama_kategori"),
+                        "Rp " + df.format(rs.getDouble("harga")),
+                        rs.getInt("totalQty"),
+                        "Rp " + df.format(rs.getDouble("totalHarga")),
+                        rs.getString("nama_kasir") + " (" + rs.getString("kasir") + ")",
+                        rs.getString("status"),
+                        tanggalWaktu
                 });
             }
 
@@ -488,22 +497,23 @@ public class LaporanPenjualan extends JFrame {
         }
     }
 
-    private void updateStatistics(java.sql.Date dari, java.sql.Date sampai, 
-                                 String kasirUsername, String kategori, String status) {
+    private void updateStatistics(java.sql.Date dari, java.sql.Date sampai,
+            String kasirUsername, String kategori, String status) {
         try (Connection conn = Database.getConnection()) {
-            if (conn == null) throw new SQLException("Koneksi database gagal!");
+            if (conn == null)
+                throw new SQLException("Koneksi database gagal!");
 
             StringBuilder sql = new StringBuilder();
             sql.append("SELECT ")
-               .append("COUNT(DISTINCT t.id) AS total_transaksi, ")
-               .append("SUM(d.qty * d.harga) AS total_omset, ")
-               .append("AVG(d.qty * d.harga) AS rata_rata ")
-               .append("FROM transaksi t ")
-               .append("JOIN detail_transaksi d ON t.id = d.transaksi_id ")
-               .append("JOIN produk p ON d.produk_id = p.id ")
-               .append("JOIN kategori k ON p.kategori_id = k.id ")
-               .append("JOIN users u ON t.kasir_id = u.id ")
-               .append("WHERE 1=1 ");
+                    .append("COUNT(DISTINCT t.id) AS total_transaksi, ")
+                    .append("SUM(d.qty * d.harga) AS total_omset, ")
+                    .append("AVG(d.qty * d.harga) AS rata_rata ")
+                    .append("FROM transaksi t ")
+                    .append("JOIN detail_transaksi d ON t.id = d.transaksi_id ")
+                    .append("JOIN produk p ON d.produk_id = p.id ")
+                    .append("JOIN kategori k ON p.kategori_id = k.id ")
+                    .append("JOIN users u ON t.kasir_id = u.id ")
+                    .append("WHERE 1=1 ");
 
             if (dari != null && sampai != null) {
                 sql.append("AND t.tanggal BETWEEN ? AND ? ");
@@ -557,30 +567,30 @@ public class LaporanPenjualan extends JFrame {
         }
     }
 
-    private String getFilterInfo(String jenisFilter, java.sql.Date dari, java.sql.Date sampai, 
-                               String kasirUsername, String kategori, String status) {
+    private String getFilterInfo(String jenisFilter, java.sql.Date dari, java.sql.Date sampai,
+            String kasirUsername, String kategori, String status) {
         StringBuilder info = new StringBuilder();
-        
+
         if (jenisFilter != null && !"Semua".equals(jenisFilter)) {
             info.append(jenisFilter);
         }
-        
+
         if (dari != null && sampai != null && !"Semua".equals(jenisFilter)) {
             info.append(" (").append(dari).append(" s/d ").append(sampai).append(")");
         }
-        
+
         if (kasirUsername != null && !kasirUsername.isEmpty()) {
             info.append(" | Kasir: ").append(kasirUsername);
         }
-        
+
         if (kategori != null && !kategori.isEmpty()) {
             info.append(" | Kategori: ").append(kategori);
         }
-        
+
         if (status != null && !status.isEmpty()) {
             info.append(" | Status: ").append(status);
         }
-        
+
         return info.toString().isEmpty() ? "Semua Data" : info.toString();
     }
 
@@ -600,16 +610,16 @@ public class LaporanPenjualan extends JFrame {
 
         try (Connection conn = Database.getConnection()) {
             String sql = "SELECT t.id, t.kode_transaksi, t.total, t.status, " +
-                        "u.nama AS nama_kasir, u.shift, " +
-                        "p.nama_produk, k.nama_kategori, " +
-                        "d.qty, d.harga, d.subtotal " +
-                        "FROM transaksi t " +
-                        "JOIN users u ON t.kasir_id = u.id " +
-                        "JOIN detail_transaksi d ON t.id = d.transaksi_id " +
-                        "JOIN produk p ON d.produk_id = p.id " +
-                        "JOIN kategori k ON p.kategori_id = k.id " +
-                        "WHERE p.kode = ? AND u.username = ? AND t.tanggal = ? " +
-                        "ORDER BY t.id DESC LIMIT 1";
+                    "u.nama AS nama_kasir, u.shift, " +
+                    "p.nama_produk, k.nama_kategori, " +
+                    "d.qty, d.harga, d.subtotal " +
+                    "FROM transaksi t " +
+                    "JOIN users u ON t.kasir_id = u.id " +
+                    "JOIN detail_transaksi d ON t.id = d.transaksi_id " +
+                    "JOIN produk p ON d.produk_id = p.id " +
+                    "JOIN kategori k ON p.kategori_id = k.id " +
+                    "WHERE p.kode = ? AND u.username = ? AND t.tanggal = ? " +
+                    "ORDER BY t.id DESC LIMIT 1";
 
             PreparedStatement pst = conn.prepareStatement(sql);
             pst.setString(1, kodeProduk);
@@ -619,30 +629,29 @@ public class LaporanPenjualan extends JFrame {
             ResultSet rs = pst.executeQuery();
             if (rs.next()) {
                 String detail = String.format(
-                    "Detail Transaksi:\n\n" +
-                    "ID Transaksi: %d\n" +
-                    "Kode Transaksi: %s\n" +
-                    "Total: Rp %s\n" +
-                    "Status: %s\n" +
-                    "Kasir: %s\n" +
-                    "Shift: %s\n" +
-                    "Produk: %s\n" +
-                    "Kategori: %s\n" +
-                    "Qty: %d\n" +
-                    "Harga Satuan: Rp %s\n" +
-                    "Subtotal: Rp %s",
-                    rs.getInt("id"),
-                    rs.getString("kode_transaksi"),
-                    df.format(rs.getDouble("total")),
-                    rs.getString("status"),
-                    rs.getString("nama_kasir"),
-                    rs.getString("shift"),
-                    rs.getString("nama_produk"),
-                    rs.getString("nama_kategori"),
-                    rs.getInt("qty"),
-                    df.format(rs.getDouble("harga")),
-                    df.format(rs.getDouble("subtotal"))
-                );
+                        "Detail Transaksi:\n\n" +
+                                "ID Transaksi: %d\n" +
+                                "Kode Transaksi: %s\n" +
+                                "Total: Rp %s\n" +
+                                "Status: %s\n" +
+                                "Kasir: %s\n" +
+                                "Shift: %s\n" +
+                                "Produk: %s\n" +
+                                "Kategori: %s\n" +
+                                "Qty: %d\n" +
+                                "Harga Satuan: Rp %s\n" +
+                                "Subtotal: Rp %s",
+                        rs.getInt("id"),
+                        rs.getString("kode_transaksi"),
+                        df.format(rs.getDouble("total")),
+                        rs.getString("status"),
+                        rs.getString("nama_kasir"),
+                        rs.getString("shift"),
+                        rs.getString("nama_produk"),
+                        rs.getString("nama_kategori"),
+                        rs.getInt("qty"),
+                        df.format(rs.getDouble("harga")),
+                        df.format(rs.getDouble("subtotal")));
 
                 JOptionPane.showMessageDialog(this, detail, "Detail Transaksi", JOptionPane.INFORMATION_MESSAGE);
             }
@@ -656,18 +665,39 @@ public class LaporanPenjualan extends JFrame {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Simpan Laporan Excel");
         fileChooser.setSelectedFile(new java.io.File("laporan_penjualan.xlsx"));
-        
+
         if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             java.io.File file = fileChooser.getSelectedFile();
             // Implementasi export Excel bisa ditambahkan di sini
-            JOptionPane.showMessageDialog(this, 
-                "Fitur export Excel akan diimplementasi!\nFile: " + file.getAbsolutePath(),
-                "Export Excel", 
-                JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                    "Fitur export Excel akan diimplementasi!\nFile: " + file.getAbsolutePath(),
+                    "Export Excel",
+                    JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new LaporanPenjualan("admin").setVisible(true));
+    }
+
+    private String resolveImagePath(String dbPath) {
+        if (dbPath == null)
+            return null;
+        java.io.File f = new java.io.File(dbPath);
+        if (f.exists() && f.isAbsolute()) {
+            return dbPath;
+        }
+        // Try looking in src/img
+        String relativePath = "src/img/" + new java.io.File(dbPath).getName();
+        if (new java.io.File(relativePath).exists()) {
+            return relativePath;
+        }
+        // Try looking in current dir (if src is not needed)
+        String localPath = "img/" + new java.io.File(dbPath).getName();
+        if (new java.io.File(localPath).exists()) {
+            return localPath;
+        }
+        // Fallback to absolute path constructed from project dir
+        return System.getProperty("user.dir") + "/src/img/" + new java.io.File(dbPath).getName();
     }
 }
