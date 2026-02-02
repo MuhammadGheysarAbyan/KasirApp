@@ -16,7 +16,7 @@ public class LaporanPenjualan extends JFrame {
     JSpinner dariTanggal, sampaiTanggal;
     JComboBox<String> comboFilter, comboKasir, comboKategori, comboStatus;
     DecimalFormat df;
-    private JLabel lblTotalOmset, lblTotalTransaksi, lblRataTransaksi;
+    private JLabel lblTotalPendapatan, lblTotalTransaksi, lblRataTransaksi, lblTotalTunai;
     private JPanel statsPanel;
 
     public LaporanPenjualan(String usernameAdmin) {
@@ -69,21 +69,28 @@ public class LaporanPenjualan extends JFrame {
         statsPanel.setOpaque(false);
         statsPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
-        lblTotalOmset = createStatCard("Total Omset", "Rp 0", new Color(0, 102, 204));
-        lblTotalTransaksi = createStatCard("Total Transaksi", "0", new Color(40, 167, 69));
-        lblRataTransaksi = createStatCard("Rata-rata/Transaksi", "Rp 0", new Color(255, 193, 7));
+        lblTotalPendapatan = createStatCard("Total Pendapatan", "Rp 0", new Color(0, 102, 204));
+        lblTotalTunai = createStatCard("Total Tunai", "Rp 0", new Color(40, 167, 69));
+        lblTotalTransaksi = createStatCard("Total Transaksi", "0", new Color(255, 193, 7));
+        lblRataTransaksi = createStatCard("Rata-rata/Transaksi", "Rp 0", new Color(23, 162, 184));
 
-        statsPanel.add(lblTotalOmset);
+        statsPanel.add(lblTotalPendapatan);
+        statsPanel.add(lblTotalTunai);
         statsPanel.add(lblTotalTransaksi);
         statsPanel.add(lblRataTransaksi);
 
-        mainPanel.add(statsPanel, BorderLayout.CENTER);
+        // Wrapper agar stats panel tidak tertimpa content box
+        JPanel centerWrapper = new JPanel(new BorderLayout(0, 10));
+        centerWrapper.setOpaque(false);
+        centerWrapper.add(statsPanel, BorderLayout.NORTH);
+
+        mainPanel.add(centerWrapper, BorderLayout.CENTER);
 
         // ================= CONTENT BOX =================
         JPanel contentBox = new JPanel(new BorderLayout(10, 10));
         contentBox.setBackground(new Color(255, 255, 255, 245));
         contentBox.setBorder(BorderFactory.createLineBorder(new Color(0, 102, 204), 2));
-        mainPanel.add(contentBox, BorderLayout.CENTER);
+        centerWrapper.add(contentBox, BorderLayout.CENTER);
 
         // ================= FILTER PANEL =================
         JPanel filterPanel = new JPanel(new BorderLayout(10, 10));
@@ -241,38 +248,38 @@ public class LaporanPenjualan extends JFrame {
     }
 
     private JLabel createStatCard(String title, String value, Color color) {
-        JPanel card = new JPanel(new BorderLayout(5, 5));
-        card.setBackground(Color.WHITE);
-        card.setBorder(BorderFactory.createCompoundBorder(
+        // Konversi warna ke Hex
+        String hexColor = String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
+
+        JLabel label = new JLabel() {
+            @Override
+            public void setText(String text) {
+                // Mencegah format HTML ganda jika text sudah ada tag htmlnya (opsional)
+                if (text != null && text.startsWith("<html>")) {
+                    super.setText(text);
+                    return;
+                }
+
+                String html = "<html><div style='text-align: center; width: 150px;'>" +
+                        "<span style='font-size: 10px; color: " + hexColor + "; font-family: Segoe UI;'>"
+                        + title.toUpperCase() + "</span><br/>" +
+                        "<span style='font-size: 14px; color: #333333; font-weight: bold; font-family: Segoe UI;'>"
+                        + text + "</span>" +
+                        "</div></html>";
+                super.setText(html);
+            }
+        };
+
+        label.setOpaque(true);
+        label.setBackground(Color.WHITE);
+        label.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(color, 2),
                 BorderFactory.createEmptyBorder(10, 15, 10, 15)));
 
-        JLabel titleLabel = new JLabel(title, JLabel.CENTER);
-        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        titleLabel.setForeground(color);
+        // Initial set
+        label.setText(value);
 
-        JLabel valueLabel = new JLabel(value, JLabel.CENTER);
-        valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        valueLabel.setForeground(Color.DARK_GRAY);
-
-        card.add(titleLabel, BorderLayout.NORTH);
-        card.add(valueLabel, BorderLayout.CENTER);
-
-        JLabel wrapper = new JLabel() {
-            @Override
-            public String getText() {
-                return value;
-            }
-
-            @Override
-            public void setText(String text) {
-                valueLabel.setText(text);
-            }
-        };
-        wrapper.setLayout(new BorderLayout());
-        wrapper.add(card);
-
-        return wrapper;
+        return label;
     }
 
     private void setTanggalHariIni() {
@@ -558,8 +565,9 @@ public class LaporanPenjualan extends JFrame {
                 double rataRata = rs.getDouble("rata_rata");
 
                 lblTotalTransaksi.setText(String.valueOf(totalTransaksi));
-                lblTotalOmset.setText("Rp " + df.format(totalOmset));
+                lblTotalPendapatan.setText("Rp " + df.format(totalOmset));
                 lblRataTransaksi.setText("Rp " + df.format(rataRata));
+                lblTotalTunai.setText("Rp " + df.format(totalOmset));
             }
 
         } catch (Exception e) {
@@ -611,7 +619,7 @@ public class LaporanPenjualan extends JFrame {
         try (Connection conn = Database.getConnection()) {
             String sql = "SELECT t.id, t.kode_transaksi, t.total, t.status, " +
                     "u.nama AS nama_kasir, u.shift, " +
-                    "p.nama_produk, k.nama_kategori, " +
+                    "p.nama_produk, p.foto, k.nama_kategori, " +
                     "d.qty, d.harga, d.subtotal " +
                     "FROM transaksi t " +
                     "JOIN users u ON t.kasir_id = u.id " +
@@ -628,19 +636,23 @@ public class LaporanPenjualan extends JFrame {
 
             ResultSet rs = pst.executeQuery();
             if (rs.next()) {
-                String detail = String.format(
-                        "Detail Transaksi:\n\n" +
-                                "ID Transaksi: %d\n" +
-                                "Kode Transaksi: %s\n" +
-                                "Total: Rp %s\n" +
-                                "Status: %s\n" +
-                                "Kasir: %s\n" +
-                                "Shift: %s\n" +
-                                "Produk: %s\n" +
-                                "Kategori: %s\n" +
-                                "Qty: %d\n" +
-                                "Harga Satuan: Rp %s\n" +
-                                "Subtotal: Rp %s",
+                // Create custom panel
+                JPanel panel = new JPanel(new BorderLayout(20, 10));
+
+                // Text details
+                String detailText = String.format(
+                        "<html><table border='0' cellspacing='5'>" +
+                                "<tr><td><b>ID Transaksi</b></td><td>: %d</td></tr>" +
+                                "<tr><td><b>Kode</b></td><td>: %s</td></tr>" +
+                                "<tr><td><b>Total</b></td><td>: Rp %s</td></tr>" +
+                                "<tr><td><b>Status</b></td><td>: %s</td></tr>" +
+                                "<tr><td><b>Kasir</b></td><td>: %s</td></tr>" +
+                                "<tr><td><b>Shift</b></td><td>: %s</td></tr>" +
+                                "<tr><td><b>Produk</b></td><td>: %s</td></tr>" +
+                                "<tr><td><b>Kategori</b></td><td>: %s</td></tr>" +
+                                "<tr><td><b>Qty</b></td><td>: %d</td></tr>" +
+                                "<tr><td><b>Harga</b></td><td>: Rp %s</td></tr>" +
+                                "<tr><td><b>Subtotal</b></td><td>: Rp %s</td></tr></table></html>",
                         rs.getInt("id"),
                         rs.getString("kode_transaksi"),
                         df.format(rs.getDouble("total")),
@@ -653,7 +665,39 @@ public class LaporanPenjualan extends JFrame {
                         df.format(rs.getDouble("harga")),
                         df.format(rs.getDouble("subtotal")));
 
-                JOptionPane.showMessageDialog(this, detail, "Detail Transaksi", JOptionPane.INFORMATION_MESSAGE);
+                JLabel lblText = new JLabel(detailText);
+                lblText.setVerticalAlignment(SwingConstants.TOP);
+                panel.add(lblText, BorderLayout.CENTER);
+
+                // Image details
+                String fotoPath = rs.getString("foto");
+                if (fotoPath != null && !fotoPath.isEmpty()) {
+                    String fixedPath = resolveImagePath(fotoPath);
+                    java.io.File f = new java.io.File(fixedPath);
+                    if (f.exists()) {
+                        ImageIcon originalIcon = new ImageIcon(fixedPath);
+                        // Scale image nicely to max 200x200
+                        int maxDim = 200;
+                        int width = originalIcon.getIconWidth();
+                        int height = originalIcon.getIconHeight();
+
+                        if (width > maxDim || height > maxDim) {
+                            float ratio = Math.min((float) maxDim / width, (float) maxDim / height);
+                            width = (int) (width * ratio);
+                            height = (int) (height * ratio);
+                        }
+
+                        ImageIcon icon = new ImageIcon(
+                                originalIcon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH));
+                        JLabel lblInfoImg = new JLabel(icon);
+                        lblInfoImg.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY, 1));
+                        JPanel imgWrapper = new JPanel(new FlowLayout(FlowLayout.CENTER));
+                        imgWrapper.add(lblInfoImg);
+                        panel.add(imgWrapper, BorderLayout.WEST);
+                    }
+                }
+
+                JOptionPane.showMessageDialog(this, panel, "Detail Transaksi", JOptionPane.PLAIN_MESSAGE);
             }
         } catch (Exception e) {
             e.printStackTrace();
